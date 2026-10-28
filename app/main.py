@@ -6,7 +6,14 @@ from app.api.v1.endpoints.categories import router as categories_router
 from app.api.v1.endpoints.issue_types import router as issue_types_router
 from app.api.v1.endpoints.complaints import router as complaints_router
 from app.api.v1.endpoints.inspections import router as inspections_router
-from app.api.v1.endpoints.team_assignments import router as team_assignments_router
+from app.api.v1.endpoints.team_assignments import (
+    router as team_assignments_router,
+)
+from app.api.v1.endpoints.rework import router as rework_router
+from app.api.v1.endpoints.testing import router as testing_router
+from app.api.v1.endpoints.decision_disposition import (
+    router as decision_disposition_router,
+)
 
 
 app = FastAPI(
@@ -36,4 +43,9 @@ app.include_router(categories_router, prefix="/api/v1")
 app.include_router(issue_types_router, prefix="/api/v1")
 app.include_router(complaints_router, prefix="/api/v1")
 app.include_router(inspections_router, prefix="/api/v1")
-app.include_router(team_assignments_router, prefix="/api/v1")
+
+# These routers already define their own /api/v1 prefixes.
+app.include_router(team_assignments_router)
+app.include_router(rework_router)
+app.include_router(testing_router)
+app.include_router(decision_disposition_router)

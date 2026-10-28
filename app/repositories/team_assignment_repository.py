@@ -4,6 +4,37 @@ from typing import Any
 from app.database.connection import get_db_connection
 
 
+def get_primary_team_for_issue(
+    issue_type_id: int,
+) -> dict[str, Any] | None:
+    """Find the active primary team mapped to an issue type."""
+
+    with get_db_connection() as connection:
+        team = connection.execute(
+            """
+            SELECT
+                t.team_id,
+                t.team_name,
+                itm.issue_type_id
+            FROM issue_type_team_mapping AS itm
+            JOIN teams AS t
+                ON t.team_id = itm.team_id
+            JOIN issue_types AS it
+                ON it.issue_type_id = itm.issue_type_id
+            WHERE itm.issue_type_id = %s
+              AND itm.is_primary = TRUE
+              AND itm.is_active = TRUE
+              AND t.is_active = TRUE
+              AND it.is_active = TRUE
+            ORDER BY itm.mapping_id
+            LIMIT 1
+            """,
+            (issue_type_id,),
+        ).fetchone()
+
+        return dict(team) if team else None
+
+
 def assign_complaint_to_team(
     *,
     complaint_number: str,
@@ -41,7 +72,8 @@ def assign_complaint_to_team(
             """
             SELECT team_id, team_name
             FROM teams
-            WHERE team_id = %s AND is_active = TRUE
+            WHERE team_id = %s
+              AND is_active = TRUE
             """,
             (team_id,),
         ).fetchone()
@@ -64,7 +96,9 @@ def assign_complaint_to_team(
 
         if is_reassignment:
             if active_assignment["team_id"] == team_id:
-                return {"error": "complaint_already_assigned_to_team"}
+                return {
+                    "error": "complaint_already_assigned_to_team"
+                }
 
             connection.execute(
                 """
@@ -87,9 +121,15 @@ def assign_complaint_to_team(
                 assignment_status
             )
             VALUES (%s, %s, %s, %s, %s, 'ACTIVE')
-            RETURNING assignment_id, complaint_id, team_id,
-                      assigned_to, assigned_by, assignment_reason,
-                      assignment_status, assigned_at
+            RETURNING
+                assignment_id,
+                complaint_id,
+                team_id,
+                assigned_to,
+                assigned_by,
+                assignment_reason,
+                assignment_status,
+                assigned_at
             """,
             (
                 complaint["complaint_id"],
@@ -154,8 +194,12 @@ def assign_complaint_to_team(
                 delivery_status
             )
             VALUES (%s, %s, %s, %s, %s, 'PENDING')
-            RETURNING notification_id, notification_type,
-                      notification_message, delivery_status, created_at
+            RETURNING
+                notification_id,
+                notification_type,
+                notification_message,
+                delivery_status,
+                created_at
             """,
             (
                 complaint["complaint_id"],
@@ -206,7 +250,8 @@ def get_assignment_history(
                 ca.assigned_at,
                 ca.completed_at
             FROM complaint_assignments AS ca
-            JOIN teams AS t ON t.team_id = ca.team_id
+            JOIN teams AS t
+                ON t.team_id = ca.team_id
             WHERE ca.complaint_id = %s
             ORDER BY ca.assigned_at, ca.assignment_id
             """,
@@ -216,5 +261,7 @@ def get_assignment_history(
         return {
             "complaint_number": complaint["complaint_number"],
             "complaint_status": complaint["complaint_status"],
-            "assignment_history": [dict(row) for row in assignments],
+            "assignment_history": [
+                dict(row) for row in assignments
+            ],
         }

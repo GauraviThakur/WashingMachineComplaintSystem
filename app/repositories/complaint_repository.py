@@ -15,8 +15,6 @@ ALLOWED_STATUS_TRANSITIONS = {
         "AWAITING_DISPOSITION",
         "AWAITING_DISPATCH",
     },
-    # Closure transitions will be enabled when disposition and
-    # dispatch prerequisites are implemented.
     "AWAITING_DISPOSITION": set(),
     "AWAITING_DISPATCH": set(),
     "CLOSED": set(),
@@ -242,6 +240,62 @@ def get_complaint_by_number(
         return dict(complaint)
 
 
+def get_machine_complaint_history(
+    serial_number: str,
+) -> dict[str, Any] | None:
+    """Return all complaints registered for a machine, oldest first."""
+
+    normalized_serial = serial_number.strip().upper()
+
+    with get_db_connection() as connection:
+        machine = connection.execute(
+            """
+            SELECT machine_id, serial_number, model_number, batch_number
+            FROM machines
+            WHERE serial_number = %s
+            """,
+            (normalized_serial,),
+        ).fetchone()
+
+        if machine is None:
+            return None
+
+        complaints = connection.execute(
+            """
+            SELECT
+                c.complaint_id,
+                c.complaint_number,
+                c.complaint_status,
+                c.priority,
+                c.reported_issue,
+                c.issue_type_id,
+                it.issue_type_name,
+                c.is_repeat_complaint,
+                c.previous_complaint_id,
+                previous.complaint_number AS previous_complaint_number,
+                c.registered_at,
+                c.closed_at
+            FROM complaints AS c
+            LEFT JOIN issue_types AS it
+                ON it.issue_type_id = c.issue_type_id
+            LEFT JOIN complaints AS previous
+                ON previous.complaint_id = c.previous_complaint_id
+            WHERE c.machine_id = %s
+            ORDER BY c.registered_at ASC, c.complaint_id ASC
+            """,
+            (machine["machine_id"],),
+        ).fetchall()
+
+        return {
+            "machine_id": machine["machine_id"],
+            "serial_number": machine["serial_number"],
+            "model_number": machine["model_number"],
+            "batch_number": machine["batch_number"],
+            "total_complaints": len(complaints),
+            "complaints": [dict(row) for row in complaints],
+        }
+
+
 def update_complaint_status(
     *,
     complaint_number: str,
@@ -252,7 +306,6 @@ def update_complaint_status(
     """Validate a status transition and record its audit history."""
 
     with get_db_connection() as connection:
-        # Lock the complaint to prevent simultaneous status updates.
         complaint = connection.execute(
             """
             SELECT complaint_id, complaint_number, complaint_status
