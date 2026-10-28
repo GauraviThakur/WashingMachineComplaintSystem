@@ -1,35 +1,30 @@
 
 from fastapi import FastAPI
 
+from app.api.v1.endpoints.machines import router as machines_router
 from app.api.v1.endpoints.categories import router as categories_router
 from app.api.v1.endpoints.issue_types import router as issue_types_router
-from app.api.v1.endpoints.machines import router as machines_router
-from app.core.config import settings
+from app.api.v1.endpoints.complaints import router as complaints_router
+from app.api.v1.endpoints.inspections import router as inspections_router
+from app.api.v1.endpoints.team_assignments import router as team_assignments_router
 
 
 app = FastAPI(
-    title=settings.app_name,
-    version=settings.app_version,
-    description=(
-        "An API-first complaint management system for returned "
-        "washing machines, from complaint intake through final closure."
-    ),
+    title="Washing Machine Complaint Management System",
+    description="Backend APIs for washing machine complaint management.",
+    version="1.0.0",
 )
 
 
-@app.get("/", tags=["General"])
-def home() -> dict[str, str]:
-    """Return the application welcome message."""
-
+@app.get("/")
+def home():
     return {
         "message": "Welcome to the Washing Machine Complaint Management System"
     }
 
 
-@app.get("/api/v1/health", tags=["Health"])
-def health_check() -> dict[str, str]:
-    """Confirm that the API process is responding."""
-
+@app.get("/api/v1/health")
+def health_check():
     return {
         "message": "Application is running",
         "status": "healthy",
@@ -39,3 +34,6 @@ def health_check() -> dict[str, str]:
 app.include_router(machines_router, prefix="/api/v1")
 app.include_router(categories_router, prefix="/api/v1")
 app.include_router(issue_types_router, prefix="/api/v1")
+app.include_router(complaints_router, prefix="/api/v1")
+app.include_router(inspections_router, prefix="/api/v1")
+app.include_router(team_assignments_router, prefix="/api/v1")

@@ -1,4 +1,3 @@
-
 -- ============================================================
 -- Washing Machine Complaint Management System
 -- File: sql/01_initial_schema.sql
@@ -30,7 +29,8 @@ CREATE TABLE IF NOT EXISTS complaint_categories (
 -- 3. Issue types
 CREATE TABLE IF NOT EXISTS issue_types (
     issue_type_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    category_id BIGINT NOT NULL REFERENCES complaint_categories(category_id),
+    category_id BIGINT NOT NULL
+        REFERENCES complaint_categories(category_id),
     issue_type_name VARCHAR(150) NOT NULL UNIQUE,
     description TEXT,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -114,7 +114,12 @@ CREATE TABLE IF NOT EXISTS bulk_request_rows (
     row_data JSONB NOT NULL,
     validation_status VARCHAR(20) NOT NULL DEFAULT 'PENDING'
         CHECK (
-            validation_status IN ('PENDING', 'VALID', 'INVALID', 'PROCESSED')
+            validation_status IN (
+                'PENDING',
+                'VALID',
+                'INVALID',
+                'PROCESSED'
+            )
         ),
     validation_errors JSONB,
     complaint_id BIGINT REFERENCES complaints(complaint_id),
@@ -130,7 +135,7 @@ CREATE TABLE IF NOT EXISTS complaint_history (
     previous_status VARCHAR(40),
     new_status VARCHAR(40) NOT NULL,
     changed_by VARCHAR(150) NOT NULL,
-    change_reason TEXT,
+    reason TEXT,
     changed_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
