@@ -16,6 +16,7 @@ from app.api.v1.endpoints.decision_disposition import (
 )
 from app.api.v1.endpoints.bulk_requests import router as bulk_requests_router
 from app.api.v1.endpoints.reports import router as reports_router
+from app.api.v1.endpoints.dashboard import router as dashboard_router
 
 
 app = FastAPI(
@@ -53,3 +54,4 @@ app.include_router(testing_router)
 app.include_router(decision_disposition_router)
 app.include_router(bulk_requests_router)
 app.include_router(reports_router)
+app.include_router(dashboard_router)
