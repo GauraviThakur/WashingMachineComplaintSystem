@@ -31,6 +31,7 @@ def register_complaint(
     reported_issue: str,
     issue_type_id: int | None,
     registered_by: str,
+    bulk_request_id: int | None = None,
 ) -> dict[str, Any]:
     """Register a complaint and record its initial history."""
 
@@ -114,6 +115,7 @@ def register_complaint(
             INSERT INTO complaints (
                 complaint_number,
                 machine_id,
+                bulk_request_id,
                 previous_complaint_id,
                 customer_name,
                 customer_contact,
@@ -125,13 +127,14 @@ def register_complaint(
                 is_repeat_complaint
             )
             VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s, %s, %s, %s,
                 'MEDIUM', 'REGISTERED', %s
             )
             RETURNING
                 complaint_id,
                 complaint_number,
                 machine_id,
+                bulk_request_id,
                 previous_complaint_id,
                 customer_name,
                 customer_contact,
@@ -148,6 +151,7 @@ def register_complaint(
             (
                 complaint_number,
                 machine_id,
+                bulk_request_id,
                 previous_complaint_id,
                 customer_name,
                 customer_contact,
@@ -203,6 +207,7 @@ def get_complaint_by_number(
                 m.serial_number,
                 m.model_number,
                 m.batch_number,
+                c.bulk_request_id,
                 c.previous_complaint_id,
                 previous.complaint_number AS previous_complaint_number,
                 c.customer_name,
@@ -265,6 +270,7 @@ def get_machine_complaint_history(
             SELECT
                 c.complaint_id,
                 c.complaint_number,
+                c.bulk_request_id,
                 c.complaint_status,
                 c.priority,
                 c.reported_issue,

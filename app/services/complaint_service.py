@@ -9,7 +9,7 @@ from app.repositories.complaint_repository import register_complaint
 def create_complaint(
     complaint_data: dict[str, Any],
 ) -> dict[str, Any]:
-    """Validate registration essentials and create a complaint."""
+    """Create a complaint, optionally linked to a bulk request."""
 
     serial_number = str(
         complaint_data.get("serial_number", "")
@@ -18,7 +18,6 @@ def create_complaint(
     if not serial_number:
         return {"error": "machine_not_found"}
 
-    # Generate a readable, unique complaint reference.
     complaint_number = (
         f"CMP-{datetime.now().strftime('%Y%m%d')}-"
         f"{secrets.token_hex(4).upper()}"
@@ -32,7 +31,8 @@ def create_complaint(
         dealer_email=complaint_data["dealer_email"],
         reported_issue=complaint_data["reported_issue"],
         issue_type_id=complaint_data.get("issue_type_id"),
-        registered_by=complaint_data["registered_by"],
+        registered_by=complaint_data.get("registered_by", "system"),
+        bulk_request_id=complaint_data.get("bulk_request_id"),
     )
 
     return result
