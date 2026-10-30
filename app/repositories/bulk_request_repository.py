@@ -178,7 +178,7 @@ def get_bulk_request(
 def get_bulk_request_rows(
     bulk_request_id: int,
 ) -> list[dict[str, Any]] | None:
-    """Retrieve row-level processing results for a bulk request."""
+    """Retrieve row-level results, including linked complaint details."""
 
     with get_db_connection() as connection:
         request = connection.execute(
@@ -204,10 +204,16 @@ def get_bulk_request_rows(
                 br.validation_errors,
                 br.complaint_id,
                 c.complaint_number,
+                c.complaint_status,
+                c.priority,
+                c.reported_issue AS registered_reported_issue,
+                it.issue_type_name,
                 br.created_at
             FROM bulk_request_rows AS br
             LEFT JOIN complaints AS c
                 ON c.complaint_id = br.complaint_id
+            LEFT JOIN issue_types AS it
+                ON it.issue_type_id = c.issue_type_id
             WHERE br.bulk_request_id = %s
             ORDER BY br.row_number
             """,

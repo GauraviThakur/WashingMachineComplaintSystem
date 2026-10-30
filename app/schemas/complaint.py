@@ -1,5 +1,10 @@
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+)
 
 
 class ComplaintCreate(BaseModel):
@@ -45,6 +50,29 @@ class ComplaintCreate(BaseModel):
         max_length=150,
         description="Person registering the complaint",
     )
+
+    @field_validator("issue_type_id", mode="before")
+    @classmethod
+    def normalize_issue_type_id(cls, value):
+        """Treat an empty optional issue type as not provided."""
+
+        if isinstance(value, str) and not value.strip():
+            return None
+
+        return value
+
+    @field_validator("registered_by", mode="before")
+    @classmethod
+    def normalize_registered_by(cls, value):
+        """Use the system account when the registering person is blank."""
+
+        if value is None:
+            return "system"
+
+        if isinstance(value, str) and not value.strip():
+            return "system"
+
+        return value
 
     model_config = ConfigDict(
         str_strip_whitespace=True,

@@ -14,7 +14,7 @@ def create_inspection(
     recommended_action: str | None,
     inspection_notes: str | None,
 ) -> dict[str, Any]:
-    """Create an inspection record for an existing complaint."""
+    """Create an inspection and update the complaint's confirmed issue type."""
 
     with get_db_connection() as connection:
         complaint = connection.execute(
@@ -22,7 +22,8 @@ def create_inspection(
             SELECT
                 complaint_id,
                 complaint_number,
-                complaint_status
+                complaint_status,
+                issue_type_id
             FROM complaints
             WHERE complaint_number = %s
             FOR UPDATE
@@ -42,13 +43,18 @@ def create_inspection(
                 "current_status": complaint["complaint_status"],
             }
 
+        issue_type = None
+
         if issue_type_id is not None:
             issue_type = connection.execute(
                 """
-                SELECT issue_type_id
-                FROM issue_types
-                WHERE issue_type_id = %s
-                  AND is_active = TRUE
+                SELECT it.issue_type_id
+                FROM issue_types AS it
+                INNER JOIN complaint_categories AS cc
+                    ON cc.category_id = it.category_id
+                WHERE it.issue_type_id = %s
+                  AND it.is_active = TRUE
+                  AND cc.is_active = TRUE
                 """,
                 (issue_type_id,),
             ).fetchone()
@@ -106,6 +112,22 @@ def create_inspection(
             ),
         ).fetchone()
 
+        # Save the inspection's identified issue type on the complaint.
+        # If no type was identified, preserve the existing classification.
+        if issue_type_id is not None:
+            connection.execute(
+                """
+                UPDATE complaints
+                SET issue_type_id = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE complaint_id = %s
+                """,
+                (
+                    issue_type_id,
+                    complaint["complaint_id"],
+                ),
+            )
+
         if complaint["complaint_status"] == "REGISTERED":
             connection.execute(
                 """
@@ -137,9 +159,31 @@ def create_inspection(
                 ),
             )
 
+        saved_classification = connection.execute(
+            """
+            SELECT
+                c.issue_type_id,
+                it.issue_type_name,
+                cc.category_id,
+                cc.category_name
+            FROM complaints AS c
+            LEFT JOIN issue_types AS it
+                ON it.issue_type_id = c.issue_type_id
+            LEFT JOIN complaint_categories AS cc
+                ON cc.category_id = it.category_id
+            WHERE c.complaint_id = %s
+            """,
+            (complaint["complaint_id"],),
+        ).fetchone()
+
         return {
             "complaint_number": complaint["complaint_number"],
-            "complaint_status": "UNDER_INSPECTION",
+            "complaint_status": (
+                "UNDER_INSPECTION"
+                if complaint["complaint_status"] == "REGISTERED"
+                else complaint["complaint_status"]
+            ),
+            "complaint_classification": dict(saved_classification),
             "inspection": dict(inspection),
         }
 
@@ -171,6 +215,7 @@ def get_inspections_by_complaint(
                 i.inspection_findings,
                 i.issue_type_id,
                 it.issue_type_name,
+                cc.category_name,
                 i.inspection_outcome,
                 i.recommended_action,
                 i.inspection_notes,
@@ -179,6 +224,8 @@ def get_inspections_by_complaint(
             FROM inspections AS i
             LEFT JOIN issue_types AS it
                 ON it.issue_type_id = i.issue_type_id
+            LEFT JOIN complaint_categories AS cc
+                ON cc.category_id = it.category_id
             WHERE i.complaint_id = %s
             ORDER BY i.inspection_number
             """,

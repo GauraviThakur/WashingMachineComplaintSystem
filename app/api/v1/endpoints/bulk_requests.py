@@ -2,11 +2,15 @@
 from typing import Annotated
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 
 from app.services.bulk_request_service import (
     get_bulk_request_details,
     process_bulk_upload,
+)
+from app.services.bulk_request_report_service import (
+    generate_bulk_request_report,
 )
 
 
@@ -53,6 +57,32 @@ async def upload_bulk_complaints(
             status_code=422,
             detail="The uploaded file contains invalid data.",
         ) from exc
+
+
+@router.get("/{bulk_request_id}/report.xlsx")
+def download_bulk_request_report(bulk_request_id: int):
+    """Download an Excel report for a previously processed bulk request."""
+
+    report_file = generate_bulk_request_report(bulk_request_id)
+
+    if report_file is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Bulk request not found.",
+        )
+
+    filename = f"bulk_request_{bulk_request_id}_report.xlsx"
+
+    return StreamingResponse(
+        report_file,
+        media_type=(
+            "application/vnd.openxmlformats-officedocument."
+            "spreadsheetml.sheet"
+        ),
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        },
+    )
 
 
 @router.get("/{bulk_request_id}")
