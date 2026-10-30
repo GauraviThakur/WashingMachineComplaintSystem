@@ -26,3 +26,8 @@ Thumbs.db
 uploads/
 reports/
 *.log
+
+# Bulk complaint testing files
+bulk_complaints_test*.csv
+bulk_request_*_report.xlsx
+~$bulk_request_*.xlsx
