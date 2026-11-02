@@ -1,5 +1,9 @@
 
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.endpoints.machines import router as machines_router
 from app.api.v1.endpoints.categories import router as categories_router
@@ -19,6 +23,12 @@ from app.api.v1.endpoints.reports import router as reports_router
 from app.api.v1.endpoints.dashboard import router as dashboard_router
 
 
+# Project directory paths
+BASE_DIR = Path(__file__).resolve().parent.parent
+FRONTEND_DIR = BASE_DIR / "frontend"
+ASSETS_DIR = FRONTEND_DIR / "assets"
+
+
 app = FastAPI(
     title="Washing Machine Complaint Management System",
     description="Backend APIs for washing machine complaint management.",
@@ -26,13 +36,39 @@ app = FastAPI(
 )
 
 
-@app.get("/")
+# Serve frontend CSS, JavaScript and images
+app.mount(
+    "/assets",
+    StaticFiles(directory=str(ASSETS_DIR)),
+    name="assets",
+)
+
+
+# Dashboard homepage
+@app.get("/", include_in_schema=False)
 def home():
-    return {
-        "message": "Welcome to the Washing Machine Complaint Management System"
-    }
+    return FileResponse(FRONTEND_DIR / "index.html")
 
 
+# All Complaints page
+@app.get("/complaints", include_in_schema=False)
+def complaints_page():
+    return FileResponse(FRONTEND_DIR / "complaints.html")
+
+
+# Register Complaint page
+@app.get("/register-complaint", include_in_schema=False)
+def register_complaint_page():
+    return FileResponse(FRONTEND_DIR / "register-complaint.html")
+
+
+# Bulk Upload page
+@app.get("/bulk-upload", include_in_schema=False)
+def bulk_upload_page():
+    return FileResponse(FRONTEND_DIR / "bulk-upload.html")
+
+
+# Health check
 @app.get("/api/v1/health")
 def health_check():
     return {
@@ -41,6 +77,7 @@ def health_check():
     }
 
 
+# API routers
 app.include_router(machines_router, prefix="/api/v1")
 app.include_router(categories_router, prefix="/api/v1")
 app.include_router(issue_types_router, prefix="/api/v1")

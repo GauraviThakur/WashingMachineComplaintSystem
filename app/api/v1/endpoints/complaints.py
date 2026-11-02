@@ -1,7 +1,8 @@
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 
 from app.repositories.complaint_repository import (
+    get_all_complaints,
     get_complaint_by_number,
     get_machine_complaint_history,
     update_complaint_status,
@@ -60,6 +61,32 @@ def register_new_complaint(
     return {
         "message": "Complaint registered successfully",
         "complaint": result,
+    }
+
+
+@router.get("/")
+def list_complaints(
+    search: str | None = Query(default=None, max_length=100),
+    complaint_status: str | None = Query(default=None),
+    priority: str | None = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+) -> dict:
+    """Retrieve complaints with optional search and filters."""
+
+    result = get_all_complaints(
+        search=search.strip() if search else None,
+        complaint_status=(
+            complaint_status.strip() if complaint_status else None
+        ),
+        priority=priority.strip() if priority else None,
+        limit=limit,
+        offset=offset,
+    )
+
+    return {
+        "message": "Complaints retrieved successfully",
+        "data": result,
     }
 
 

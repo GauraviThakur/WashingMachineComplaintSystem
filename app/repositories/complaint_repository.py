@@ -21,6 +21,120 @@ ALLOWED_STATUS_TRANSITIONS = {
 }
 
 
+def get_all_complaints(
+    *,
+    search: str | None = None,
+    complaint_status: str | None = None,
+    priority: str | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> dict[str, Any]:
+    """Retrieve complaints with optional search, filters and pagination."""
+
+    conditions = []
+    parameters: list[Any] = []
+
+    if search:
+        search_value = f"%{search.strip()}%"
+        conditions.append(
+            """
+            (
+                c.complaint_number ILIKE %s
+                OR m.serial_number ILIKE %s
+                OR m.model_number ILIKE %s
+                OR c.customer_name ILIKE %s
+                OR c.reported_issue ILIKE %s
+            )
+            """
+        )
+        parameters.extend([search_value] * 5)
+
+    if complaint_status:
+        conditions.append("c.complaint_status = %s")
+        parameters.append(complaint_status.upper())
+
+    if priority:
+        conditions.append("c.priority = %s")
+        parameters.append(priority.upper())
+
+    where_clause = (
+        "WHERE " + " AND ".join(conditions)
+        if conditions
+        else ""
+    )
+
+    with get_db_connection() as connection:
+
+        count_query = f"""
+            SELECT COUNT(*) AS total
+            FROM complaints AS c
+            INNER JOIN machines AS m
+                ON m.machine_id = c.machine_id
+            {where_clause}
+        """
+
+        total_result = connection.execute(
+            count_query,
+            tuple(parameters),
+        ).fetchone()
+
+        total = total_result["total"]
+
+        complaints_query = f"""
+            SELECT
+                c.complaint_id,
+                c.complaint_number,
+                c.machine_id,
+                m.serial_number,
+                m.model_number,
+                m.batch_number,
+                c.bulk_request_id,
+                c.previous_complaint_id,
+                previous.complaint_number AS previous_complaint_number,
+                c.customer_name,
+                c.customer_contact,
+                c.dealer_email,
+                c.reported_issue,
+                c.issue_type_id,
+                it.issue_type_name,
+                cc.category_id,
+                cc.category_name,
+                c.priority,
+                c.complaint_status,
+                c.is_repeat_complaint,
+                c.registered_at,
+                c.closed_at,
+                c.created_at,
+                c.updated_at
+            FROM complaints AS c
+            INNER JOIN machines AS m
+                ON m.machine_id = c.machine_id
+            LEFT JOIN complaints AS previous
+                ON previous.complaint_id = c.previous_complaint_id
+            LEFT JOIN issue_types AS it
+                ON it.issue_type_id = c.issue_type_id
+            LEFT JOIN complaint_categories AS cc
+                ON cc.category_id = it.category_id
+            {where_clause}
+            ORDER BY c.registered_at DESC, c.complaint_id DESC
+            LIMIT %s OFFSET %s
+        """
+
+        complaint_parameters = parameters + [limit, offset]
+
+        rows = connection.execute(
+            complaints_query,
+            tuple(complaint_parameters),
+        ).fetchall()
+
+        return {
+            "items": [dict(row) for row in rows],
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        }
+
+
 def register_complaint(
     *,
     complaint_number: str,
@@ -248,7 +362,7 @@ def get_complaint_by_number(
 def get_machine_complaint_history(
     serial_number: str,
 ) -> dict[str, Any] | None:
-    """Return all complaints registered for a machine, oldest first."""
+    """Return all complaints associated with a machine, oldest first."""
 
     normalized_serial = serial_number.strip().upper()
 
