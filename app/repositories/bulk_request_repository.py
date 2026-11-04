@@ -33,7 +33,9 @@ def create_bulk_request(
                 invalid_rows,
                 request_status,
                 uploaded_at,
-                completed_at
+                completed_at,
+                complaint_completion_status,
+                complaints_completed_at
             """,
             (source_file_name, uploaded_by, total_rows),
         ).fetchone()
@@ -108,14 +110,17 @@ def finish_bulk_request(
     valid_rows: int,
     invalid_rows: int,
 ) -> dict[str, Any] | None:
-    """Store final counts and processing status for a bulk request."""
+    """Store upload results and initialize complaint completion tracking."""
 
     if valid_rows == 0:
         request_status = "FAILED"
+        complaint_completion_status = "NOT_APPLICABLE"
     elif invalid_rows > 0:
         request_status = "PARTIALLY_PROCESSED"
+        complaint_completion_status = "IN_PROGRESS"
     else:
         request_status = "PROCESSED"
+        complaint_completion_status = "IN_PROGRESS"
 
     with get_db_connection() as connection:
         request = connection.execute(
@@ -124,7 +129,9 @@ def finish_bulk_request(
             SET valid_rows = %s,
                 invalid_rows = %s,
                 request_status = %s,
-                completed_at = CURRENT_TIMESTAMP
+                completed_at = CURRENT_TIMESTAMP,
+                complaint_completion_status = %s,
+                complaints_completed_at = NULL
             WHERE bulk_request_id = %s
             RETURNING
                 bulk_request_id,
@@ -135,12 +142,15 @@ def finish_bulk_request(
                 invalid_rows,
                 request_status,
                 uploaded_at,
-                completed_at
+                completed_at,
+                complaint_completion_status,
+                complaints_completed_at
             """,
             (
                 valid_rows,
                 invalid_rows,
                 request_status,
+                complaint_completion_status,
                 bulk_request_id,
             ),
         ).fetchone()
@@ -165,7 +175,9 @@ def get_bulk_request(
                 invalid_rows,
                 request_status,
                 uploaded_at,
-                completed_at
+                completed_at,
+                complaint_completion_status,
+                complaints_completed_at
             FROM bulk_requests
             WHERE bulk_request_id = %s
             """,
@@ -173,6 +185,57 @@ def get_bulk_request(
         ).fetchone()
 
         return dict(request) if request is not None else None
+
+
+def search_bulk_requests(
+    search_term: str,
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    """
+    Search bulk requests by exact ID or partial filename.
+
+    Returns the latest matching requests, up to the supplied limit.
+    """
+
+    search_term = search_term.strip()
+
+    if not search_term:
+        return []
+
+    with get_db_connection() as connection:
+        requests = connection.execute(
+            """
+            SELECT
+                bulk_request_id,
+                source_file_name,
+                uploaded_by,
+                total_rows,
+                valid_rows,
+                invalid_rows,
+                request_status,
+                uploaded_at,
+                completed_at,
+                complaint_completion_status,
+                complaints_completed_at
+            FROM bulk_requests
+            WHERE
+                (
+                    %s ~ '^[0-9]+$'
+                    AND bulk_request_id = %s
+                )
+                OR source_file_name ILIKE %s
+            ORDER BY uploaded_at DESC, bulk_request_id DESC
+            LIMIT %s
+            """,
+            (
+                search_term,
+                int(search_term) if search_term.isdigit() else -1,
+                f"%{search_term}%",
+                limit,
+            ),
+        ).fetchall()
+
+        return [dict(request) for request in requests]
 
 
 def get_bulk_request_rows(

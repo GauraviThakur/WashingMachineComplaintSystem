@@ -109,9 +109,15 @@ def create_rework_attempt(
             ),
         ).fetchone()
 
-        new_status = "UNDER_TESTING" if (
-            rework_result == "COMPLETED" and requires_testing
-        ) else "UNDER_REWORK"
+        # Determine the next workflow status.
+        if rework_result == "UNSUCCESSFUL":
+            new_status = "AWAITING_DECISION"
+
+        elif rework_result == "COMPLETED" and requires_testing:
+            new_status = "UNDER_TESTING"
+
+        else:
+            new_status = "UNDER_REWORK"
 
         if current_status != new_status:
             connection.execute(
@@ -123,6 +129,16 @@ def create_rework_attempt(
                 """,
                 (new_status, complaint_id),
             )
+
+            if new_status == "AWAITING_DECISION":
+                history_reason = (
+                    f"Rework attempt {attempt_number} was unsuccessful. "
+                    "Complaint forwarded to Quality Manager for final review."
+                )
+            else:
+                history_reason = (
+                    f"Rework attempt {attempt_number}: {rework_result}"
+                )
 
             connection.execute(
                 """
@@ -140,7 +156,7 @@ def create_rework_attempt(
                     current_status,
                     new_status,
                     performed_by,
-                    f"Rework attempt {attempt_number}: {rework_result}",
+                    history_reason,
                 ),
             )
 

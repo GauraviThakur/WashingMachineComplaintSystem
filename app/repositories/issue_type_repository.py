@@ -37,3 +37,30 @@ def get_issue_types(
         rows = connection.execute(query, parameters).fetchall()
 
     return [dict(row) for row in rows]
+
+
+def get_issue_type_by_id(
+    issue_type_id: int,
+) -> dict[str, Any] | None:
+    """Retrieve one active issue type by its ID."""
+
+    with get_db_connection() as connection:
+        issue_type = connection.execute(
+            """
+            SELECT
+                it.issue_type_id,
+                it.issue_type_name,
+                it.description,
+                it.category_id,
+                c.category_name
+            FROM issue_types AS it
+            INNER JOIN complaint_categories AS c
+                ON c.category_id = it.category_id
+            WHERE it.issue_type_id = %s
+              AND it.is_active = TRUE
+              AND c.is_active = TRUE
+            """,
+            (issue_type_id,),
+        ).fetchone()
+
+    return dict(issue_type) if issue_type else None

@@ -12,6 +12,7 @@ from app.repositories.bulk_request_repository import (
     finish_bulk_request,
     get_bulk_request,
     get_bulk_request_rows,
+    search_bulk_requests,
     update_bulk_request_row,
 )
 from app.schemas.complaint import ComplaintCreate
@@ -367,3 +368,14 @@ def get_bulk_request_details(
         "bulk_request": request,
         "rows": rows or [],
     }
+
+
+def search_bulk_request_records(
+    search_term: str,
+) -> list[dict[str, Any]]:
+    """Search bulk requests by request ID or uploaded filename."""
+
+    if not search_term or not search_term.strip():
+        return []
+
+    return search_bulk_requests(search_term.strip())

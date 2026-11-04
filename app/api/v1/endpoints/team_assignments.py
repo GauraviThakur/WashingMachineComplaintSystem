@@ -91,12 +91,29 @@ def create_automatic_team_assignment(
                 ),
             )
 
+        if error == "inspection_not_found":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Record an inspection before automatic assignment.",
+            )
+
+        if error == "inspection_outcome_not_eligible_for_assignment":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Automatic assignment is allowed only when the latest "
+                    "inspection outcome is ISSUE_IDENTIFIED or "
+                    "REPAIR_REQUIRED. Current outcome: "
+                    f"{result.get('inspection_outcome')}."
+                ),
+            )
+
         if error == "inspection_issue_type_missing":
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
-                    "No inspection with an issue type was found. "
-                    "Record an inspection with an issue type first."
+                    "The latest inspection does not contain an issue type. "
+                    "Record an eligible inspection with an issue type first."
                 ),
             )
 
@@ -127,7 +144,9 @@ def create_automatic_team_assignment(
         )
 
     return {
-        "message": "Complaint assigned automatically based on inspection findings.",
+        "message": (
+            "Complaint assigned automatically based on inspection findings."
+        ),
         "data": result,
     }
 

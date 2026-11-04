@@ -1,0 +1,434 @@
+﻿
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Testing Management | Washing Machine CMS</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/style.css">
+
+    <style>
+        /* Testing page only: allow the sidebar menu to scroll independently. */
+        .sidebar-menu {
+            min-height: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+        }
+
+        .sidebar-menu::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .sidebar-menu::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="app-container">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+
+        <div class="sidebar-brand">
+            <div class="brand-icon">
+                <i class="bi bi-gear-wide-connected"></i>
+            </div>
+
+            <div>
+                <h5>WashCare CMS</h5>
+                <small>Complaint Management</small>
+            </div>
+        </div>
+
+        <div class="sidebar-menu">
+
+            <p class="menu-heading">MAIN MENU</p>
+
+            <a href="/" class="menu-link">
+                <i class="bi bi-grid"></i>
+                <span>Dashboard</span>
+            </a>
+
+            <p class="menu-heading">COMPLAINT MANAGEMENT</p>
+
+            <a href="/complaints" class="menu-link">
+                <i class="bi bi-clipboard-data"></i>
+                <span>All Complaints</span>
+            </a>
+
+            <a href="/register-complaint" class="menu-link">
+                <i class="bi bi-plus-circle"></i>
+                <span>Register Complaint</span>
+            </a>
+
+            <a href="/bulk-upload" class="menu-link">
+                <i class="bi bi-file-earmark-arrow-up"></i>
+                <span>Bulk Upload</span>
+            </a>
+
+            <p class="menu-heading">WORKFLOW</p>
+
+            <a href="/inspection" class="menu-link">
+                <i class="bi bi-search"></i>
+                <span>Inspection</span>
+            </a>
+
+            <a href="/team-assessment" class="menu-link">
+                <i class="bi bi-people"></i>
+                <span>Team Assignment</span>
+            </a>
+
+            <a href="/team-assessment" class="menu-link">
+                <i class="bi bi-person-check"></i>
+                <span>Team Assessment</span>
+            </a>
+
+            <a href="/rework" class="menu-link">
+                <i class="bi bi-tools"></i>
+                <span>Rework</span>
+            </a>
+
+            <a href="/testing" class="menu-link active">
+                <i class="bi bi-clipboard-check"></i>
+                <span>Testing</span>
+            </a>
+
+            <a href="/quality-decision" class="menu-link">
+                <i class="bi bi-check2-square"></i>
+                <span>Decision &amp; Disposition</span>
+            </a>
+
+            <p class="menu-heading">OTHER</p>
+
+            <a href="/reports" class="menu-link">
+                <i class="bi bi-file-earmark-bar-graph"></i>
+                <span>Reports</span>
+            </a>
+
+        </div>
+
+        <div class="sidebar-footer">
+            <i class="bi bi-shield-check"></i>
+            <span>Manufacturing CMS</span>
+        </div>
+
+    </aside>
+
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+
+        <header class="topbar">
+
+            <div>
+                <h5 class="mb-0">Testing Management</h5>
+                <small class="text-muted">
+                    Record and review washing machine test results
+                </small>
+            </div>
+
+            <div class="topbar-actions">
+                <div class="profile-section">
+                    <div class="profile-avatar">A</div>
+
+                    <div>
+                        <strong>Testing Engineer</strong>
+                        <small>System User</small>
+                    </div>
+                </div>
+            </div>
+
+        </header>
+
+
+        <section class="dashboard-content">
+
+            <div class="mb-4">
+                <h4>Testing</h4>
+                <p class="text-muted mb-0">
+                    Load a complaint that has completed rework or is awaiting testing,
+                    perform the required tests, and record the results.
+                </p>
+            </div>
+
+            <div id="pageMessage"></div>
+
+
+            <!-- COMPLAINT LOOKUP -->
+            <div class="dashboard-panel mb-4">
+
+                <div class="panel-heading">
+                    <h5 class="mb-0">
+                        <i class="bi bi-search me-2"></i>Find Complaint
+                    </h5>
+                </div>
+
+                <div class="p-3">
+                    <div class="row g-3 align-items-end">
+
+                        <div class="col-md-8">
+                            <label for="complaintNumber" class="form-label">
+                                Complaint Number <span class="text-danger">*</span>
+                            </label>
+
+                            <input
+                                type="text"
+                                class="form-control"
+                                id="complaintNumber"
+                                placeholder="Enter complaint number"
+                                required
+                            >
+                        </div>
+
+                        <div class="col-md-4">
+                            <button
+                                type="button"
+                                class="btn btn-primary w-100"
+                                id="loadComplaintBtn"
+                            >
+                                <i class="bi bi-search me-2"></i>Load Complaint
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+
+
+            <!-- COMPLAINT DETAILS -->
+            <div class="dashboard-panel mb-4 d-none" id="complaintDetailsSection">
+
+                <div class="panel-heading">
+                    <h5 class="mb-0">
+                        <i class="bi bi-info-circle me-2"></i>Complaint Information
+                    </h5>
+                </div>
+
+                <div class="p-3">
+                    <div class="row g-3">
+
+                        <div class="col-md-4">
+                            <label class="form-label">Complaint Number</label>
+                            <input type="text" class="form-control" id="detailComplaintNumber" readonly>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Machine Serial Number</label>
+                            <input type="text" class="form-control" id="detailSerialNumber" readonly>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Model Number</label>
+                            <input type="text" class="form-control" id="detailModelNumber" readonly>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Customer Name</label>
+                            <input type="text" class="form-control" id="detailCustomerName" readonly>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Dealer Email</label>
+                            <input type="text" class="form-control" id="detailDealerEmail" readonly>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Current Status</label>
+                            <input type="text" class="form-control" id="detailComplaintStatus" readonly>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label">Reported Issue</label>
+                            <textarea
+                                class="form-control"
+                                id="detailReportedIssue"
+                                rows="2"
+                                readonly
+                            ></textarea>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+
+
+            <!-- TESTING FORM -->
+            <div class="dashboard-panel mb-4 d-none" id="testingFormSection">
+
+                <div class="panel-heading">
+                    <h5 class="mb-0">
+                        <i class="bi bi-clipboard2-pulse me-2"></i>Record Testing
+                    </h5>
+                </div>
+
+                <div class="p-3">
+
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        Testing can be recorded only when the complaint status is
+                        <strong>UNDER_TESTING</strong>.
+                    </div>
+
+                    <form id="testingForm">
+
+                        <div class="row g-3">
+
+                            <div class="col-md-6">
+                                <label for="testedBy" class="form-label">
+                                    Tested By <span class="text-danger">*</span>
+                                </label>
+
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    id="testedBy"
+                                    minlength="2"
+                                    maxlength="150"
+                                    required
+                                    placeholder="Enter testing engineer name"
+                                >
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="testType" class="form-label">
+                                    Test Type <span class="text-danger">*</span>
+                                </label>
+
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    id="testType"
+                                    minlength="2"
+                                    maxlength="100"
+                                    required
+                                    placeholder="Enter test type"
+                                >
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="testResult" class="form-label">
+                                    Test Result <span class="text-danger">*</span>
+                                </label>
+
+                                <select class="form-select" id="testResult" required>
+                                    <option value="">Select test result</option>
+                                    <option value="PASS">Pass</option>
+                                    <option value="FAIL">Fail</option>
+                                </select>
+                            </div>
+
+                            <div class="col-12">
+                                <label for="testObservations" class="form-label">
+                                    Test Observations <span class="text-danger">*</span>
+                                </label>
+
+                                <textarea
+                                    class="form-control"
+                                    id="testObservations"
+                                    rows="4"
+                                    minlength="3"
+                                    maxlength="5000"
+                                    required
+                                    placeholder="Describe the tests performed and the observations..."
+                                ></textarea>
+                            </div>
+
+                            <div class="col-12">
+                                <label for="testNotes" class="form-label">
+                                    Additional Testing Notes
+                                </label>
+
+                                <textarea
+                                    class="form-control"
+                                    id="testNotes"
+                                    rows="3"
+                                    maxlength="5000"
+                                    placeholder="Enter additional remarks, if any..."
+                                ></textarea>
+                            </div>
+
+                        </div>
+
+                        <div class="mt-4" id="testingMessage"></div>
+
+                        <div class="d-flex justify-content-end gap-2 mt-3">
+
+                            <button type="reset" class="btn btn-outline-secondary">
+                                Reset Form
+                            </button>
+
+                            <button type="submit" class="btn btn-primary" id="submitTestBtn">
+                                <i class="bi bi-check-circle me-2"></i>Submit Test Result
+                            </button>
+
+                        </div>
+
+                    </form>
+
+                </div>
+
+            </div>
+
+
+            <!-- TEST RESULT -->
+            <div class="dashboard-panel mb-4 d-none" id="testResultSection">
+
+                <div class="panel-heading">
+                    <h5 class="mb-0">
+                        <i class="bi bi-check-circle me-2"></i>Testing Result
+                    </h5>
+                </div>
+
+                <div class="p-3" id="testResultBody"></div>
+
+            </div>
+
+
+            <!-- TESTING HISTORY -->
+            <div class="dashboard-panel mb-4 d-none" id="testHistorySection">
+
+                <div class="panel-heading">
+                    <h5 class="mb-0">
+                        <i class="bi bi-clock-history me-2"></i>Testing History
+                    </h5>
+                </div>
+
+                <div class="p-3" id="testHistoryBody"></div>
+
+            </div>
+
+        </section>
+
+
+        <footer class="main-footer">
+
+            <span>Washing Machine Complaint Management System</span>
+
+            <span>&copy; 2026</span>
+
+        </footer>
+
+    </main>
+
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script src="/assets/js/app.js"></script>
+<script src="/assets/js/testing.js"></script>
+
+</body>
+</html>

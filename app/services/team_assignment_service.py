@@ -9,6 +9,12 @@ from app.repositories.team_assignment_repository import (
 from app.database.connection import get_db_connection
 
 
+ALLOWED_ASSIGNMENT_OUTCOMES = {
+    "ISSUE_IDENTIFIED",
+    "REPAIR_REQUIRED",
+}
+
+
 def assign_complaint(
     *,
     complaint_number: str,
@@ -34,7 +40,7 @@ def assign_complaint_automatically(
     assigned_by: str,
     assigned_to: str | None = None,
 ) -> dict[str, Any]:
-    """Select the primary team using the latest inspection issue type."""
+    """Select the primary team using the latest eligible inspection."""
 
     normalized_number = complaint_number.strip().upper()
 
@@ -62,10 +68,11 @@ def assign_complaint_automatically(
 
         inspection = connection.execute(
             """
-            SELECT issue_type_id
+            SELECT
+                issue_type_id,
+                inspection_outcome
             FROM inspections
             WHERE complaint_id = %s
-              AND issue_type_id IS NOT NULL
             ORDER BY inspection_number DESC
             LIMIT 1
             """,
@@ -73,6 +80,15 @@ def assign_complaint_automatically(
         ).fetchone()
 
     if inspection is None:
+        return {"error": "inspection_not_found"}
+
+    if inspection["inspection_outcome"] not in ALLOWED_ASSIGNMENT_OUTCOMES:
+        return {
+            "error": "inspection_outcome_not_eligible_for_assignment",
+            "inspection_outcome": inspection["inspection_outcome"],
+        }
+
+    if inspection["issue_type_id"] is None:
         return {"error": "inspection_issue_type_missing"}
 
     team = get_primary_team_for_issue(inspection["issue_type_id"])

@@ -1,0 +1,466 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Washing Machine CMS | Bulk Request Tracking</title>
+
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+    >
+
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+        rel="stylesheet"
+    >
+
+    <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+
+<body>
+
+<div class="app-container">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+
+        <div class="sidebar-brand">
+            <div class="brand-icon">
+                <i class="bi bi-gear-wide-connected"></i>
+            </div>
+
+            <div>
+                <h5>WashCare CMS</h5>
+                <small>Complaint Management</small>
+            </div>
+        </div>
+
+        <div class="sidebar-menu">
+
+            <p class="menu-heading">MAIN MENU</p>
+
+            <a href="/" class="menu-link">
+                <i class="bi bi-grid"></i>
+                <span>Dashboard</span>
+            </a>
+
+            <p class="menu-heading">COMPLAINT MANAGEMENT</p>
+
+            <a href="/complaints" class="menu-link">
+                <i class="bi bi-clipboard-data"></i>
+                <span>All Complaints</span>
+            </a>
+
+            <a href="/register-complaint" class="menu-link">
+                <i class="bi bi-plus-circle"></i>
+                <span>Register Complaint</span>
+            </a>
+
+            <a href="/bulk-upload" class="menu-link">
+                <i class="bi bi-file-earmark-arrow-up"></i>
+                <span>Bulk Upload</span>
+            </a>
+
+            <a href="/bulk-tracking" class="menu-link active">
+                <i class="bi bi-list-check"></i>
+                <span>Bulk Request Tracking</span>
+            </a>
+
+            <p class="menu-heading">WORKFLOW</p>
+
+            <a href="/inspection" class="menu-link">
+                <i class="bi bi-search"></i>
+                <span>Inspection</span>
+            </a>
+
+            <a href="/team-assessment" class="menu-link">
+                <i class="bi bi-people"></i>
+                <span>Team Assignment</span>
+            </a>
+
+            <a href="/rework" class="menu-link">
+                <i class="bi bi-tools"></i>
+                <span>Rework</span>
+            </a>
+
+            <a href="/testing" class="menu-link">
+                <i class="bi bi-clipboard-check"></i>
+                <span>Testing</span>
+            </a>
+
+            <a href="/quality-decision" class="menu-link">
+                <i class="bi bi-check2-square"></i>
+                <span>Decision & Disposition</span>
+            </a>
+
+            <p class="menu-heading">OTHER</p>
+
+            <a href="/reports" class="menu-link">
+                <i class="bi bi-file-earmark-bar-graph"></i>
+                <span>Reports</span>
+            </a>
+
+        </div>
+
+        <div class="sidebar-footer">
+            <i class="bi bi-shield-check"></i>
+            <span>Manufacturing CMS</span>
+        </div>
+
+    </aside>
+
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+
+        <!-- TOPBAR -->
+        <header class="topbar">
+
+            <div>
+                <h4>Bulk Request Tracking</h4>
+                <p>Track uploaded dealer files and their individual complaints.</p>
+            </div>
+
+            <div class="topbar-actions">
+
+                <button class="icon-button" type="button" title="Notifications">
+                    <i class="bi bi-bell"></i>
+                </button>
+
+                <div class="profile-section">
+                    <div class="profile-avatar">A</div>
+
+                    <div>
+                        <strong>Administrator</strong>
+                        <small>System User</small>
+                    </div>
+                </div>
+
+            </div>
+
+        </header>
+
+
+        <!-- PAGE CONTENT -->
+        <section class="dashboard-content">
+
+            <!-- PAGE HEADING -->
+            <div class="page-heading">
+                <div>
+                    <h5>Bulk Request Tracking</h5>
+                    <p>
+                        Search for a bulk request and monitor the progress
+                        of its individual complaints.
+                    </p>
+                </div>
+            </div>
+
+
+            <!-- SEARCH SECTION -->
+            <div class="dashboard-panel mb-4">
+
+                <div class="panel-heading">
+                    <div>
+                        <h6>Search Bulk Request</h6>
+                        <span>
+                            Enter a Bulk Request ID or part of the uploaded filename.
+                        </span>
+                    </div>
+                </div>
+
+                <form id="bulkTrackingSearchForm">
+
+                    <div class="row g-3 align-items-end">
+
+                        <div class="col-lg-9">
+
+                            <label for="bulkTrackingSearch" class="form-label">
+                                Bulk Request ID or Filename
+                            </label>
+
+                            <input
+                                type="text"
+                                class="form-control"
+                                id="bulkTrackingSearch"
+                                placeholder="Example: 10 or washing_machine_bulk_complaints_test"
+                                maxlength="255"
+                                required
+                            >
+
+                        </div>
+
+                        <div class="col-lg-3">
+
+                            <button
+                                type="submit"
+                                class="btn btn-primary w-100"
+                                id="bulkTrackingSearchBtn"
+                            >
+                                <i class="bi bi-search me-2"></i>
+                                Search
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                </form>
+
+                <div
+                    id="bulkTrackingSearchMessage"
+                    class="mt-3"
+                    aria-live="polite"
+                ></div>
+
+            </div>
+
+
+            <!-- SEARCH RESULTS -->
+            <div id="bulkTrackingResultsSection" class="d-none mb-4">
+
+                <div class="dashboard-panel">
+
+                    <div class="panel-heading">
+                        <div>
+                            <h6>Search Results</h6>
+                            <span id="bulkTrackingResultsCount">
+                                Matching bulk requests.
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+
+                        <table class="table complaints-table">
+
+                            <thead>
+                                <tr>
+                                    <th>Request ID</th>
+                                    <th>Source File</th>
+                                    <th>Uploaded By</th>
+                                    <th>Total Rows</th>
+                                    <th>Upload Status</th>
+                                    <th>Complaint Completion</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+
+                            <tbody id="bulkTrackingResultsTable">
+                                <tr>
+                                    <td colspan="7" class="text-center">
+                                        Search for a bulk request.
+                                    </td>
+                                </tr>
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- REQUEST DETAILS -->
+            <div id="bulkTrackingDetailsSection" class="d-none">
+
+                <!-- REQUEST SUMMARY -->
+                <div class="dashboard-panel mb-4">
+
+                    <div class="panel-heading">
+
+                        <div>
+                            <h6>Bulk Request Summary</h6>
+                            <span>
+                                Request information and overall complaint progress.
+                            </span>
+                        </div>
+
+                        <button
+                            type="button"
+                            class="btn btn-success btn-sm"
+                            id="downloadBulkTrackingReportBtn"
+                        >
+                            <i class="bi bi-file-earmark-excel me-2"></i>
+                            Download Excel Report
+                        </button>
+
+                    </div>
+
+
+                    <!-- SUMMARY CARDS -->
+                    <div class="row g-3 mb-4">
+
+                        <div class="col-xl-3 col-md-6">
+                            <div class="summary-card">
+                                <div class="summary-icon blue">
+                                    <i class="bi bi-collection"></i>
+                                </div>
+                                <div>
+                                    <p>Total Rows</p>
+                                    <h3 id="trackingTotalRows">--</h3>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-xl-3 col-md-6">
+                            <div class="summary-card">
+                                <div class="summary-icon green">
+                                    <i class="bi bi-check-circle"></i>
+                                </div>
+                                <div>
+                                    <p>Valid Rows</p>
+                                    <h3 id="trackingValidRows">--</h3>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-xl-3 col-md-6">
+                            <div class="summary-card">
+                                <div class="summary-icon orange">
+                                    <i class="bi bi-exclamation-circle"></i>
+                                </div>
+                                <div>
+                                    <p>Invalid Rows</p>
+                                    <h3 id="trackingInvalidRows">--</h3>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-xl-3 col-md-6">
+                            <div class="summary-card">
+                                <div class="summary-icon purple">
+                                    <i class="bi bi-hash"></i>
+                                </div>
+                                <div>
+                                    <p>Bulk Request ID</p>
+                                    <h3 id="trackingRequestId">--</h3>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+
+                    <!-- REQUEST INFORMATION -->
+                    <div class="row g-3">
+
+                        <div class="col-md-6">
+                            <p class="mb-1 text-muted small">Source File</p>
+                            <strong id="trackingSourceFile">--</strong>
+                        </div>
+
+                        <div class="col-md-6">
+                            <p class="mb-1 text-muted small">Uploaded By</p>
+                            <strong id="trackingUploadedBy">--</strong>
+                        </div>
+
+                        <div class="col-md-6">
+                            <p class="mb-1 text-muted small">Upload Status</p>
+                            <strong id="trackingRequestStatus">--</strong>
+                        </div>
+
+                        <div class="col-md-6">
+                            <p class="mb-1 text-muted small">
+                                Complaint Completion Status
+                            </p>
+                            <strong id="trackingCompletionStatus">--</strong>
+                        </div>
+
+                        <div class="col-md-6">
+                            <p class="mb-1 text-muted small">Uploaded At</p>
+                            <strong id="trackingUploadedAt">--</strong>
+                        </div>
+
+                        <div class="col-md-6">
+                            <p class="mb-1 text-muted small">Upload Processing Completed At</p>
+                            <strong id="trackingProcessedAt">--</strong>
+                        </div>
+
+                        <div class="col-md-6">
+                            <p class="mb-1 text-muted small">
+                                Complaints Completed At
+                            </p>
+                            <strong id="trackingComplaintsCompletedAt">--</strong>
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- UPLOADED ROW DETAILS -->
+                <div class="dashboard-panel">
+
+                    <div class="panel-heading">
+                        <div>
+                            <h6>Uploaded Row Details</h6>
+                            <span>
+                                Individual complaint registration and lifecycle status.
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+
+                        <table class="table complaints-table">
+
+                            <thead>
+                                <tr>
+                                    <th>File Row</th>
+                                    <th>Machine Serial Number</th>
+                                    <th>Customer</th>
+                                    <th>Reported Issue</th>
+                                    <th>Issue Type</th>
+                                    <th>Validation</th>
+                                    <th>Complaint Number</th>
+                                    <th>Complaint Status</th>
+                                    <th>Priority</th>
+                                    <th>Errors</th>
+                                </tr>
+                            </thead>
+
+                            <tbody id="bulkTrackingRowsTable">
+
+                                <tr>
+                                    <td colspan="10" class="text-center">
+                                        No row details available.
+                                    </td>
+                                </tr>
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- FOOTER -->
+        <footer class="main-footer">
+            <span>Washing Machine Complaint Management System</span>
+            <span>&copy; 2026</span>
+        </footer>
+
+    </main>
+
+</div>
+
+
+<!-- JAVASCRIPT -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script src="/assets/js/app.js"></script>
+<script src="/assets/js/bulk-tracking.js"></script>
+
+</body>
+</html>

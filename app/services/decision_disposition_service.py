@@ -2,11 +2,14 @@
 from app.repositories.decision_disposition_repository import (
     record_complaint_decision,
     record_complaint_disposition,
+    record_physical_completion,
     get_decision_disposition_history,
 )
+
 from app.schemas.decision_disposition import (
     DecisionCreate,
     DispositionCreate,
+    PhysicalCompletionCreate,
 )
 
 
@@ -26,6 +29,18 @@ def create_disposition(disposition_data: DispositionCreate) -> dict:
         disposition_type=disposition_data.disposition_type,
         disposition_reason=disposition_data.disposition_reason,
         recorded_by=disposition_data.recorded_by,
+    )
+
+
+def create_physical_completion(
+    completion_data: PhysicalCompletionCreate,
+) -> dict:
+    return record_physical_completion(
+        complaint_number=completion_data.complaint_number.strip().upper(),
+        completion_type=completion_data.completion_type,
+        reference_number=completion_data.reference_number,
+        completion_details=completion_data.completion_details,
+        completed_by=completion_data.completed_by,
     )
 
 

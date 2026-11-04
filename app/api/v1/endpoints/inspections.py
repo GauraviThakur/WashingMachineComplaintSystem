@@ -25,6 +25,9 @@ def create_inspection_endpoint(
 
     error = result.get("error")
 
+    if not error:
+        return result
+
     if error == "complaint_not_found":
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -46,7 +49,40 @@ def create_inspection_endpoint(
             detail="The selected issue type does not exist or is inactive.",
         )
 
-    return result
+    if error == "invalid_inspection_outcome":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="The supplied inspection outcome is invalid.",
+        )
+
+    if error == "issue_type_required_for_team_assignment":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "An issue type is required when the inspection outcome "
+                "is ISSUE_IDENTIFIED or REPAIR_REQUIRED."
+            ),
+        )
+
+    if error == "primary_team_mapping_not_found":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "No active primary team mapping exists for the selected "
+                "issue type. Configure a primary team mapping first."
+            ),
+        )
+
+    if error == "complaint_already_has_active_assignment":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This complaint already has an active team assignment.",
+        )
+
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="An unexpected error occurred while recording the inspection.",
+    )
 
 
 @router.get("/{complaint_number}")

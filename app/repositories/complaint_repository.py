@@ -144,10 +144,16 @@ def register_complaint(
     dealer_email: str,
     reported_issue: str,
     issue_type_id: int | None,
+    priority: str,
     registered_by: str,
     bulk_request_id: int | None = None,
 ) -> dict[str, Any]:
-    """Register a complaint and record its initial history."""
+    """Register a complaint with its calculated priority and history."""
+
+    allowed_priorities = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
+
+    if priority not in allowed_priorities:
+        return {"error": "invalid_priority"}
 
     with get_db_connection() as connection:
         machine = connection.execute(
@@ -242,7 +248,7 @@ def register_complaint(
             )
             VALUES (
                 %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                'MEDIUM', 'REGISTERED', %s
+                %s, 'REGISTERED', %s
             )
             RETURNING
                 complaint_id,
@@ -272,6 +278,7 @@ def register_complaint(
                 dealer_email,
                 reported_issue,
                 issue_type_id,
+                priority,
                 is_repeat_complaint,
             ),
         ).fetchone()

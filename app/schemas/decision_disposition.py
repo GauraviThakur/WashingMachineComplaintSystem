@@ -19,7 +19,10 @@ class DecisionCreate(BaseModel):
     @model_validator(mode="after")
     def validate_rejection_reason(self):
         if self.decision_type == "REJECTED":
-            if not self.rejection_reason or len(self.rejection_reason.strip()) < 3:
+            if (
+                not self.rejection_reason
+                or len(self.rejection_reason.strip()) < 3
+            ):
                 raise ValueError(
                     "A rejection reason of at least 3 characters is required."
                 )
@@ -33,9 +36,7 @@ class DispositionCreate(BaseModel):
     disposition_type: Literal[
         "RETURN_TO_STOCK",
         "SCRAP",
-        "HOLD",
         "RETURN_TO_DEALER",
-        "OTHER",
     ]
 
     disposition_reason: str = Field(min_length=3, max_length=5000)
@@ -45,3 +46,44 @@ class DispositionCreate(BaseModel):
         str_strip_whitespace=True,
         extra="forbid",
     )
+
+
+class PhysicalCompletionCreate(BaseModel):
+    complaint_number: str = Field(min_length=1, max_length=50)
+
+    completion_type: Literal[
+        "DISPATCH",
+        "STOCK_TRANSFER",
+        "SCRAP",
+    ]
+
+    reference_number: str | None = Field(
+        default=None,
+        max_length=100,
+    )
+
+    completion_details: str | None = Field(
+        default=None,
+        max_length=5000,
+    )
+
+    completed_by: str = Field(min_length=2, max_length=150)
+
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        extra="forbid",
+    )
+
+    @model_validator(mode="after")
+    def validate_completion_reference(self):
+        if self.completion_type in ("DISPATCH", "STOCK_TRANSFER"):
+            if (
+                not self.reference_number
+                or len(self.reference_number.strip()) < 1
+            ):
+                raise ValueError(
+                    "A reference number is required for dispatch "
+                    "and stock transfer completion."
+                )
+
+        return self

@@ -91,8 +91,66 @@ def _add_section(
     story.append(Spacer(1, 4 * mm))
 
 
+def _get_report_styles() -> dict:
+    base_styles = getSampleStyleSheet()
+
+    return {
+        "title": ParagraphStyle(
+            "ComplaintReportTitle",
+            parent=base_styles["Title"],
+            fontName="Helvetica-Bold",
+            fontSize=16,
+            leading=21,
+            alignment=TA_CENTER,
+            textColor=colors.HexColor("#17365D"),
+            spaceAfter=4 * mm,
+        ),
+        "subtitle": ParagraphStyle(
+            "ComplaintReportSubtitle",
+            parent=base_styles["Normal"],
+            fontSize=9,
+            leading=12,
+            alignment=TA_CENTER,
+            textColor=colors.HexColor("#475569"),
+            spaceAfter=3 * mm,
+        ),
+        "section": ParagraphStyle(
+            "ComplaintReportSection",
+            parent=base_styles["Heading2"],
+            fontSize=11,
+            leading=14,
+            textColor=colors.HexColor("#17365D"),
+            spaceBefore=3 * mm,
+            spaceAfter=2 * mm,
+            keepWithNext=True,
+        ),
+        "label": ParagraphStyle(
+            "ComplaintReportLabel",
+            parent=base_styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=8,
+            leading=11,
+        ),
+        "body": ParagraphStyle(
+            "ComplaintReportBody",
+            parent=base_styles["Normal"],
+            fontSize=8,
+            leading=11,
+            wordWrap="CJK",
+        ),
+        "small": ParagraphStyle(
+            "ComplaintReportSmall",
+            parent=base_styles["Normal"],
+            fontSize=8,
+            leading=11,
+            textColor=colors.HexColor("#475569"),
+        ),
+    }
+
+
 def _fetch_report_data(
     complaint_number: str,
+    require_rejected: bool = True,
 ) -> dict[str, Any] | None:
     with get_db_connection() as connection:
         complaint = connection.execute(
@@ -178,7 +236,10 @@ def _fetch_report_data(
         if complaint is None:
             return None
 
-        if complaint["decision_type"] != "REJECTED":
+        if (
+            require_rejected
+            and complaint["decision_type"] != "REJECTED"
+        ):
             return {"error": "complaint_not_rejected"}
 
         complaint_id = complaint["complaint_id"]
@@ -222,6 +283,395 @@ def _fetch_report_data(
             "inspections": [dict(row) for row in inspections],
             "tests": [dict(row) for row in tests],
         }
+
+
+def _create_pdf_document(
+    buffer: BytesIO,
+    title: str,
+) -> SimpleDocTemplate:
+    return SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=20 * mm,
+        leftMargin=20 * mm,
+        topMargin=18 * mm,
+        bottomMargin=18 * mm,
+        title=title,
+        author="Washing Machine Complaint Management System",
+    )
+
+
+def _add_inspection_history(
+    story: list,
+    inspections: list[dict],
+    styles: dict,
+) -> None:
+    story.append(
+        Paragraph(
+            "Inspection History",
+            styles["section"],
+        )
+    )
+
+    if not inspections:
+        story.append(
+            Paragraph(
+                "No inspection records were found for this complaint.",
+                styles["body"],
+            )
+        )
+        return
+
+    for item in inspections:
+        inspection_content = [
+            Paragraph(
+                "Inspection #"
+                f"{escape(_format_value(item['inspection_number']))}",
+                styles["section"],
+            ),
+            Paragraph(
+                "<b>Inspected by:</b> "
+                f"{escape(_format_value(item['inspected_by']))}",
+                styles["body"],
+            ),
+            Paragraph(
+                "<b>Findings:</b> "
+                f"{escape(_format_value(item['inspection_findings']))}",
+                styles["body"],
+            ),
+            Paragraph(
+                "<b>Outcome:</b> "
+                f"{escape(_format_value(item['inspection_outcome']))}",
+                styles["body"],
+            ),
+            Paragraph(
+                "<b>Recommended action:</b> "
+                f"{escape(_format_value(item['recommended_action']))}",
+                styles["body"],
+            ),
+            Paragraph(
+                "<b>Inspection notes:</b> "
+                f"{escape(_format_value(item['inspection_notes']))}",
+                styles["body"],
+            ),
+            Paragraph(
+                "<b>Inspected at:</b> "
+                f"{escape(_format_value(item['inspected_at']))}",
+                styles["body"],
+            ),
+            Spacer(1, 3 * mm),
+        ]
+
+        story.append(KeepTogether(inspection_content))
+
+
+def _add_testing_history(
+    story: list,
+    tests: list[dict],
+    styles: dict,
+) -> None:
+    story.append(
+        Paragraph(
+            "Testing History",
+            styles["section"],
+        )
+    )
+
+    if not tests:
+        story.append(
+            Paragraph(
+                "No testing records were found for this complaint.",
+                styles["body"],
+            )
+        )
+        return
+
+    for item in tests:
+        test_content = [
+            Paragraph(
+                "Test #"
+                f"{escape(_format_value(item['test_number']))}",
+                styles["section"],
+            ),
+            Paragraph(
+                "<b>Test type:</b> "
+                f"{escape(_format_value(item['test_type']))}",
+                styles["body"],
+            ),
+            Paragraph(
+                "<b>Result:</b> "
+                f"{escape(_format_value(item['test_result']))}",
+                styles["body"],
+            ),
+            Paragraph(
+                "<b>Observations:</b> "
+                f"{escape(_format_value(item['test_observations']))}",
+                styles["body"],
+            ),
+            Paragraph(
+                "<b>Test notes:</b> "
+                f"{escape(_format_value(item['test_notes']))}",
+                styles["body"],
+            ),
+            Paragraph(
+                "<b>Tested by:</b> "
+                f"{escape(_format_value(item['tested_by']))}",
+                styles["body"],
+            ),
+            Paragraph(
+                "<b>Tested at:</b> "
+                f"{escape(_format_value(item['tested_at']))}",
+                styles["body"],
+            ),
+            Spacer(1, 3 * mm),
+        ]
+
+        story.append(KeepTogether(test_content))
+
+
+def generate_individual_complaint_report(
+    complaint_number: str,
+) -> dict[str, Any]:
+    normalized_number = complaint_number.strip().upper()
+
+    data = _fetch_report_data(
+        normalized_number,
+        require_rejected=False,
+    )
+
+    if data is None:
+        return {"error": "complaint_not_found"}
+
+    complaint = data["complaint"]
+    styles = _get_report_styles()
+
+    buffer = BytesIO()
+
+    document = _create_pdf_document(
+        buffer,
+        f"Complaint Report - {complaint['complaint_number']}",
+    )
+
+    story = [
+        Paragraph(
+            "WASHING MACHINE COMPLAINT REPORT",
+            styles["title"],
+        ),
+        Paragraph(
+            "Complaint: "
+            f"{escape(_format_value(complaint['complaint_number']))}",
+            styles["subtitle"],
+        ),
+        Paragraph(
+            "Complete recorded information for this complaint",
+            styles["subtitle"],
+        ),
+        Spacer(1, 3 * mm),
+    ]
+
+    _add_section(
+        story,
+        "1. Complaint and Machine Identification",
+        [
+            ("Complaint number", complaint["complaint_number"]),
+            ("Machine serial number", complaint["serial_number"]),
+            ("Model number", complaint["model_number"]),
+            ("Batch number", complaint["batch_number"]),
+            ("Manufacturing date", complaint["manufacturing_date"]),
+            ("Complaint registered at", complaint["registered_at"]),
+            ("Complaint status", complaint["complaint_status"]),
+            ("Priority", complaint["priority"]),
+        ],
+        styles,
+    )
+
+    _add_section(
+        story,
+        "2. Customer and Dealer Information",
+        [
+            ("Customer name", complaint["customer_name"]),
+            ("Customer contact", complaint["customer_contact"]),
+            ("Dealer email", complaint["dealer_email"]),
+        ],
+        styles,
+    )
+
+    _add_section(
+        story,
+        "3. Issue Details and Classification",
+        [
+            ("Reported issue", complaint["reported_issue"]),
+            ("Issue category", complaint["category_name"]),
+            ("Issue type", complaint["issue_type_name"]),
+        ],
+        styles,
+    )
+
+    story.append(
+        Paragraph(
+            "4. Inspection Findings",
+            styles["section"],
+        )
+    )
+
+    if not data["inspections"]:
+        story.append(
+            Paragraph(
+                "No inspection records were found for this complaint.",
+                styles["body"],
+            )
+        )
+    else:
+        for item in data["inspections"]:
+            inspection_content = [
+                Paragraph(
+                    "Inspection #"
+                    f"{escape(_format_value(item['inspection_number']))}",
+                    styles["section"],
+                ),
+                Paragraph(
+                    "<b>Inspected by:</b> "
+                    f"{escape(_format_value(item['inspected_by']))}",
+                    styles["body"],
+                ),
+                Paragraph(
+                    "<b>Findings:</b> "
+                    f"{escape(_format_value(item['inspection_findings']))}",
+                    styles["body"],
+                ),
+                Paragraph(
+                    "<b>Outcome:</b> "
+                    f"{escape(_format_value(item['inspection_outcome']))}",
+                    styles["body"],
+                ),
+                Paragraph(
+                    "<b>Recommended action:</b> "
+                    f"{escape(_format_value(item['recommended_action']))}",
+                    styles["body"],
+                ),
+                Paragraph(
+                    "<b>Inspection notes:</b> "
+                    f"{escape(_format_value(item['inspection_notes']))}",
+                    styles["body"],
+                ),
+                Paragraph(
+                    "<b>Inspected at:</b> "
+                    f"{escape(_format_value(item['inspected_at']))}",
+                    styles["body"],
+                ),
+                Spacer(1, 3 * mm),
+            ]
+
+            story.append(KeepTogether(inspection_content))
+
+    story.append(Spacer(1, 2 * mm))
+
+    story.append(
+        Paragraph(
+            "5. Testing Results",
+            styles["section"],
+        )
+    )
+
+    if not data["tests"]:
+        story.append(
+            Paragraph(
+                "No testing records were found for this complaint.",
+                styles["body"],
+            )
+        )
+    else:
+        for item in data["tests"]:
+            test_content = [
+                Paragraph(
+                    "Test #"
+                    f"{escape(_format_value(item['test_number']))}",
+                    styles["section"],
+                ),
+                Paragraph(
+                    "<b>Test type:</b> "
+                    f"{escape(_format_value(item['test_type']))}",
+                    styles["body"],
+                ),
+                Paragraph(
+                    "<b>Result:</b> "
+                    f"{escape(_format_value(item['test_result']))}",
+                    styles["body"],
+                ),
+                Paragraph(
+                    "<b>Observations:</b> "
+                    f"{escape(_format_value(item['test_observations']))}",
+                    styles["body"],
+                ),
+                Paragraph(
+                    "<b>Test notes:</b> "
+                    f"{escape(_format_value(item['test_notes']))}",
+                    styles["body"],
+                ),
+                Paragraph(
+                    "<b>Tested by:</b> "
+                    f"{escape(_format_value(item['tested_by']))}",
+                    styles["body"],
+                ),
+                Paragraph(
+                    "<b>Tested at:</b> "
+                    f"{escape(_format_value(item['tested_at']))}",
+                    styles["body"],
+                ),
+                Spacer(1, 3 * mm),
+            ]
+
+            story.append(KeepTogether(test_content))
+
+    _add_section(
+        story,
+        "6. Quality Decision",
+        [
+            ("Decision", complaint["decision_type"]),
+            ("Decision reason", complaint["decision_reason"]),
+            ("Rejection reason", complaint["rejection_reason"]),
+            ("Decision recorded by", complaint["decided_by"]),
+            ("Decision date and time", complaint["decided_at"]),
+        ],
+        styles,
+    )
+
+    _add_section(
+        story,
+        "7. Final Disposition",
+        [
+            ("Disposition", complaint["disposition_type"]),
+            ("Disposition reason", complaint["disposition_reason"]),
+            ("Recorded by", complaint["disposition_recorded_by"]),
+            ("Recorded at", complaint["disposition_recorded_at"]),
+        ],
+        styles,
+    )
+
+    story.append(Spacer(1, 5 * mm))
+
+    story.append(
+        Paragraph(
+            "This report contains the complaint information and "
+            "related inspection, testing, decision, and disposition "
+            "records available in the system at the time of report "
+            "generation. Missing information is shown as "
+            "'Not recorded' or 'No records available'. The absence "
+            "of a record does not confirm that an activity was "
+            "performed or that a particular outcome was achieved.",
+            styles["small"],
+        )
+    )
+
+    document.build(story)
+
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+
+    return {
+        "complaint_number": complaint["complaint_number"],
+        "pdf_bytes": pdf_bytes,
+    }
 
 
 def generate_rejection_report(

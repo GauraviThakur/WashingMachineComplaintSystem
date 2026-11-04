@@ -4,6 +4,19 @@ from typing import Any
 from app.database.connection import get_db_connection
 
 
+TEAM_ASSIGNMENT_OUTCOMES = {
+    "ISSUE_IDENTIFIED",
+    "REPAIR_REQUIRED",
+}
+
+VALID_INSPECTION_OUTCOMES = {
+    "ISSUE_IDENTIFIED",
+    "NO_ISSUE_FOUND",
+    "FURTHER_TESTING_REQUIRED",
+    "REPAIR_REQUIRED",
+}
+
+
 def create_inspection(
     *,
     complaint_number: str,
@@ -14,7 +27,16 @@ def create_inspection(
     recommended_action: str | None,
     inspection_notes: str | None,
 ) -> dict[str, Any]:
-    """Create an inspection and update the complaint's confirmed issue type."""
+    """Create an inspection and process its outcome atomically."""
+
+    if inspection_outcome not in VALID_INSPECTION_OUTCOMES:
+        return {"error": "invalid_inspection_outcome"}
+
+    if (
+        inspection_outcome in TEAM_ASSIGNMENT_OUTCOMES
+        and issue_type_id is None
+    ):
+        return {"error": "issue_type_required_for_team_assignment"}
 
     with get_db_connection() as connection:
         complaint = connection.execute(
@@ -43,8 +65,7 @@ def create_inspection(
                 "current_status": complaint["complaint_status"],
             }
 
-        issue_type = None
-
+        # Validate the issue type before creating any records.
         if issue_type_id is not None:
             issue_type = connection.execute(
                 """
@@ -62,6 +83,59 @@ def create_inspection(
             if issue_type is None:
                 return {"error": "invalid_issue_type"}
 
+        # Find the primary team before inserting the inspection.
+        # This prevents an inspection from being saved without its
+        # required assignment when a team mapping is unavailable.
+        team = None
+
+        if inspection_outcome in TEAM_ASSIGNMENT_OUTCOMES:
+            team = connection.execute(
+                """
+                SELECT
+                    t.team_id,
+                    t.team_name
+                FROM issue_type_team_mapping AS itm
+                INNER JOIN teams AS t
+                    ON t.team_id = itm.team_id
+                INNER JOIN issue_types AS it
+                    ON it.issue_type_id = itm.issue_type_id
+                WHERE itm.issue_type_id = %s
+                  AND itm.is_primary = TRUE
+                  AND itm.is_active = TRUE
+                  AND t.is_active = TRUE
+                  AND it.is_active = TRUE
+                ORDER BY itm.mapping_id
+                LIMIT 1
+                """,
+                (issue_type_id,),
+            ).fetchone()
+
+            if team is None:
+                return {"error": "primary_team_mapping_not_found"}
+
+            active_assignment = connection.execute(
+                """
+                SELECT assignment_id
+                FROM complaint_assignments
+                WHERE complaint_id = %s
+                  AND assignment_status = 'ACTIVE'
+                FOR UPDATE
+                """,
+                (complaint["complaint_id"],),
+            ).fetchone()
+
+            if active_assignment is not None:
+                return {"error": "complaint_already_has_active_assignment"}
+
+        # Determine the complaint's next status.
+        if inspection_outcome in TEAM_ASSIGNMENT_OUTCOMES:
+            new_status = "ASSIGNED"
+        elif inspection_outcome == "NO_ISSUE_FOUND":
+            new_status = "AWAITING_QUALITY_REVIEW"
+        else:
+            new_status = "UNDER_TESTING"
+
+        # Calculate the next inspection attempt number.
         next_inspection = connection.execute(
             """
             SELECT COALESCE(MAX(inspection_number), 0) + 1
@@ -74,6 +148,7 @@ def create_inspection(
 
         inspection_number = next_inspection["next_number"]
 
+        # Record the inspection.
         inspection = connection.execute(
             """
             INSERT INTO inspections (
@@ -112,8 +187,7 @@ def create_inspection(
             ),
         ).fetchone()
 
-        # Save the inspection's identified issue type on the complaint.
-        # If no type was identified, preserve the existing classification.
+        # Save the confirmed issue type when supplied.
         if issue_type_id is not None:
             connection.execute(
                 """
@@ -128,37 +202,125 @@ def create_inspection(
                 ),
             )
 
-        if complaint["complaint_status"] == "REGISTERED":
-            connection.execute(
-                """
-                UPDATE complaints
-                SET complaint_status = 'UNDER_INSPECTION',
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE complaint_id = %s
-                """,
-                (complaint["complaint_id"],),
+        previous_status = complaint["complaint_status"]
+
+        # Update complaint status.
+        connection.execute(
+            """
+            UPDATE complaints
+            SET complaint_status = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE complaint_id = %s
+            """,
+            (
+                new_status,
+                complaint["complaint_id"],
+            ),
+        )
+
+        # Record the status transition.
+        history_reason = (
+            f"Inspection attempt {inspection_number} completed. "
+            f"Outcome: {inspection_outcome}."
+        )
+
+        connection.execute(
+            """
+            INSERT INTO complaint_history (
+                complaint_id,
+                previous_status,
+                new_status,
+                changed_by,
+                reason
+            )
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (
+                complaint["complaint_id"],
+                previous_status,
+                new_status,
+                inspected_by,
+                history_reason,
+            ),
+        )
+
+        assignment_result = None
+
+        # Automatically assign the primary team for confirmed issues.
+        if team is not None:
+            assignment_reason = (
+                f"Inspection identified issue type ID {issue_type_id}. "
+                f"Automatically assigned to the primary mapped team."
             )
 
-            connection.execute(
+            assignment = connection.execute(
                 """
-                INSERT INTO complaint_history (
+                INSERT INTO complaint_assignments (
                     complaint_id,
-                    previous_status,
-                    new_status,
-                    changed_by,
-                    reason
+                    team_id,
+                    assigned_to,
+                    assigned_by,
+                    assignment_reason,
+                    assignment_status
                 )
-                VALUES (%s, %s, %s, %s, %s)
+                VALUES (%s, %s, NULL, %s, %s, 'ACTIVE')
+                RETURNING
+                    assignment_id,
+                    complaint_id,
+                    team_id,
+                    assigned_to,
+                    assigned_by,
+                    assignment_reason,
+                    assignment_status,
+                    assigned_at
                 """,
                 (
                     complaint["complaint_id"],
-                    "REGISTERED",
-                    "UNDER_INSPECTION",
+                    team["team_id"],
                     inspected_by,
-                    "Inspection started and inspection findings recorded.",
+                    assignment_reason,
                 ),
+            ).fetchone()
+
+            notification_message = (
+                f"Complaint {complaint['complaint_number']} "
+                f"has been assigned to team {team['team_name']}. "
+                f"Reason: {assignment_reason}"
             )
 
+            notification = connection.execute(
+                """
+                INSERT INTO team_notifications (
+                    complaint_id,
+                    assignment_id,
+                    team_id,
+                    notification_type,
+                    notification_message,
+                    delivery_status
+                )
+                VALUES (%s, %s, %s, 'NEW_ASSIGNMENT', %s, 'PENDING')
+                RETURNING
+                    notification_id,
+                    notification_type,
+                    notification_message,
+                    delivery_status,
+                    created_at
+                """,
+                (
+                    complaint["complaint_id"],
+                    assignment["assignment_id"],
+                    team["team_id"],
+                    notification_message,
+                ),
+            ).fetchone()
+
+            assignment_result = {
+                "team": dict(team),
+                "assignment": dict(assignment),
+                "notification": dict(notification),
+            }
+
+        # Retrieve the complaint's saved classification.
         saved_classification = connection.execute(
             """
             SELECT
@@ -178,13 +340,11 @@ def create_inspection(
 
         return {
             "complaint_number": complaint["complaint_number"],
-            "complaint_status": (
-                "UNDER_INSPECTION"
-                if complaint["complaint_status"] == "REGISTERED"
-                else complaint["complaint_status"]
-            ),
+            "previous_status": previous_status,
+            "complaint_status": new_status,
             "complaint_classification": dict(saved_classification),
             "inspection": dict(inspection),
+            "assignment": assignment_result,
         }
 
 

@@ -4,12 +4,16 @@ from fastapi import APIRouter, HTTPException, status
 from app.schemas.decision_disposition import (
     DecisionCreate,
     DispositionCreate,
+    PhysicalCompletionCreate,
 )
+
 from app.services.decision_disposition_service import (
     create_decision,
     create_disposition,
+    create_physical_completion,
     fetch_decision_disposition_history,
 )
+
 
 router = APIRouter(
     prefix="/api/v1/decision-disposition",
@@ -39,17 +43,42 @@ def handle_workflow_error(result: dict) -> None:
         )
 
     error_messages = {
-        "decision_already_recorded": "A decision has already been recorded.",
-        "rejection_reason_required": "A rejection reason is required.",
-        "decision_not_found": "Record a decision before recording disposition.",
+        "decision_already_recorded": (
+            "A decision has already been recorded."
+        ),
+        "rejection_reason_required": (
+            "A rejection reason is required."
+        ),
+        "decision_not_found": (
+            "Record a decision before recording disposition."
+        ),
+        "disposition_not_found": (
+            "Record a disposition before recording physical completion."
+        ),
         "disposition_already_recorded": (
             "A disposition has already been recorded."
         ),
         "invalid_rejected_disposition": (
-            "Rejected machines must use SCRAP, HOLD, or OTHER."
+            "Rejected machines must use SCRAP."
         ),
         "invalid_accepted_disposition": (
-            "Accepted machines cannot use SCRAP through this workflow."
+            "Accepted machines must use RETURN_TO_STOCK "
+            "or RETURN_TO_DEALER."
+        ),
+        "invalid_disposition": (
+            "The recorded disposition is not supported."
+        ),
+        "invalid_completion_type": (
+            "The physical completion type does not match "
+            "the recorded disposition. "
+            f"Expected: {result.get('expected_completion_type')}."
+        ),
+        "completion_reference_required": (
+            "A reference number is required for dispatch "
+            "and stock transfer completion."
+        ),
+        "physical_completion_already_recorded": (
+            "Physical completion has already been recorded."
         ),
     }
 
@@ -65,7 +94,10 @@ def handle_workflow_error(result: dict) -> None:
     )
 
 
-@router.post("/decision", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/decision",
+    status_code=status.HTTP_201_CREATED,
+)
 def submit_decision(decision_data: DecisionCreate):
     result = create_decision(decision_data)
     handle_workflow_error(result)
@@ -76,13 +108,38 @@ def submit_decision(decision_data: DecisionCreate):
     }
 
 
-@router.post("/disposition", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/disposition",
+    status_code=status.HTTP_201_CREATED,
+)
 def submit_disposition(disposition_data: DispositionCreate):
     result = create_disposition(disposition_data)
     handle_workflow_error(result)
 
     return {
-        "message": "Complaint disposition recorded and complaint closed.",
+        "message": (
+            "Complaint disposition recorded successfully. "
+            "Physical completion is pending."
+        ),
+        **result,
+    }
+
+
+@router.post(
+    "/physical-completion",
+    status_code=status.HTTP_201_CREATED,
+)
+def submit_physical_completion(
+    completion_data: PhysicalCompletionCreate,
+):
+    result = create_physical_completion(completion_data)
+    handle_workflow_error(result)
+
+    return {
+        "message": (
+            "Physical completion recorded successfully. "
+            "Complaint closed."
+        ),
         **result,
     }
 

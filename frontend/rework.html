@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rework Management | Washing Machine CMS</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+
+<body>
+<div class="app-container">
+
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <i class="bi bi-gear-wide-connected me-2"></i>
+            Washing Machine CMS
+        </div>
+
+        <div class="sidebar-menu">
+            <div class="menu-section">MAIN MENU</div>
+            <a href="/" class="menu-link">
+                <i class="bi bi-speedometer2"></i><span>Dashboard</span>
+            </a>
+
+            <div class="menu-section">COMPLAINT MANAGEMENT</div>
+            <a href="/complaints" class="menu-link">
+                <i class="bi bi-list-check"></i><span>All Complaints</span>
+            </a>
+            <a href="/register-complaint" class="menu-link">
+                <i class="bi bi-plus-circle"></i><span>Register Complaint</span>
+            </a>
+            <a href="/bulk-upload" class="menu-link">
+                <i class="bi bi-file-earmark-spreadsheet"></i><span>Bulk Upload</span>
+            </a>
+
+            <div class="menu-section">WORKFLOW</div>
+            <a href="/inspection" class="menu-link">
+                <i class="bi bi-search"></i><span>Inspection</span>
+            </a>
+            <a href="/rework" class="menu-link active">
+                <i class="bi bi-tools"></i><span>Rework</span>
+            </a>
+            <a href="/testing" class="menu-link">
+                <i class="bi bi-clipboard2-check"></i><span>Testing</span>
+            </a>
+            <a href="/quality-decision" class="menu-link">
+                <i class="bi bi-patch-check"></i><span>Quality Decision</span>
+            </a>
+            <a href="/disposition" class="menu-link">
+                <i class="bi bi-box-seam"></i><span>Final Disposition</span>
+            </a>
+        </div>
+    </aside>
+
+    <main class="main-content">
+
+        <header class="topbar">
+            <div>
+                <h5 class="mb-0">Rework Management</h5>
+                <small class="text-muted">Record repair activities for assigned complaints</small>
+            </div>
+            <div>
+                <span class="text-muted">
+                    <i class="bi bi-person-circle me-1"></i>
+                    Rework Engineer
+                </span>
+            </div>
+        </header>
+
+        <section class="dashboard-content">
+
+            <div class="mb-4">
+                <h4>Rework</h4>
+                <p class="text-muted mb-0">
+                    Load an assigned complaint, review its rework history,
+                    and record the latest repair attempt.
+                </p>
+            </div>
+
+            <div id="pageMessage"></div>
+
+            <!-- Complaint lookup -->
+            <div class="dashboard-panel mb-4">
+                <div class="panel-heading">
+                    <h5 class="mb-0">
+                        <i class="bi bi-search me-2"></i>Find Complaint
+                    </h5>
+                </div>
+
+                <div class="p-3">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-8">
+                            <label for="complaintNumber" class="form-label">
+                                Complaint Number <span class="text-danger">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                class="form-control"
+                                id="complaintNumber"
+                                placeholder="Enter complaint number"
+                                required
+                            >
+                        </div>
+
+                        <div class="col-md-4">
+                            <button
+                                type="button"
+                                class="btn btn-primary w-100"
+                                id="loadComplaintBtn"
+                            >
+                                <i class="bi bi-search me-2"></i>Load Complaint
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Complaint details -->
+            <div class="dashboard-panel mb-4 d-none" id="complaintDetailsSection">
+                <div class="panel-heading">
+                    <h5 class="mb-0">
+                        <i class="bi bi-info-circle me-2"></i>Complaint Information
+                    </h5>
+                </div>
+
+                <div class="p-3">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Complaint Number</label>
+                            <input type="text" class="form-control" id="detailComplaintNumber" readonly>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Machine Serial Number</label>
+                            <input type="text" class="form-control" id="detailSerialNumber" readonly>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Model Number</label>
+                            <input type="text" class="form-control" id="detailModelNumber" readonly>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Customer Name</label>
+                            <input type="text" class="form-control" id="detailCustomerName" readonly>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Dealer Email</label>
+                            <input type="text" class="form-control" id="detailDealerEmail" readonly>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Current Status</label>
+                            <input type="text" class="form-control" id="detailComplaintStatus" readonly>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label">Reported Issue</label>
+                            <textarea class="form-control" id="detailReportedIssue" rows="2" readonly></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rework form -->
+            <div class="dashboard-panel mb-4 d-none" id="reworkFormSection">
+                <div class="panel-heading">
+                    <h5 class="mb-0">
+                        <i class="bi bi-tools me-2"></i>Record Rework
+                    </h5>
+                </div>
+
+                <div class="p-3">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        Rework can be recorded only when the complaint is
+                        <strong>ASSIGNED</strong> or <strong>UNDER_REWORK</strong>
+                        and has an active team assignment.
+                    </div>
+
+                    <form id="reworkForm">
+                        <div class="row g-3">
+
+                            <div class="col-md-6">
+                                <label for="performedBy" class="form-label">
+                                    Performed By <span class="text-danger">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    id="performedBy"
+                                    minlength="2"
+                                    maxlength="150"
+                                    required
+                                    placeholder="Enter engineer or technician name"
+                                >
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="reworkResult" class="form-label">
+                                    Rework Result <span class="text-danger">*</span>
+                                </label>
+                                <select class="form-select" id="reworkResult" required>
+                                    <option value="">Select rework result</option>
+                                    <option value="COMPLETED">Completed</option>
+                                    <option value="UNSUCCESSFUL">Unsuccessful</option>
+                                    <option value="PARTIALLY_COMPLETED">Partially Completed</option>
+                                </select>
+                            </div>
+
+                            <div class="col-12">
+                                <label for="reworkAction" class="form-label">
+                                    Rework Action <span class="text-danger">*</span>
+                                </label>
+                                <textarea
+                                    class="form-control"
+                                    id="reworkAction"
+                                    rows="4"
+                                    minlength="3"
+                                    maxlength="5000"
+                                    required
+                                    placeholder="Describe the repair or corrective action performed..."
+                                ></textarea>
+                            </div>
+
+                            <div class="col-12">
+                                <label for="partsReplaced" class="form-label">
+                                    Parts Replaced
+                                </label>
+                                <textarea
+                                    class="form-control"
+                                    id="partsReplaced"
+                                    rows="2"
+                                    maxlength="5000"
+                                    placeholder="Enter replaced parts, or leave blank if none..."
+                                ></textarea>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="requiresTesting" class="form-label">
+                                    Is further testing required?
+                                </label>
+                                <select class="form-select" id="requiresTesting">
+                                    <option value="true" selected>Yes</option>
+                                    <option value="false">No</option>
+                                </select>
+                            </div>
+
+                            <div class="col-12">
+                                <label for="reworkNotes" class="form-label">
+                                    Additional Rework Notes
+                                </label>
+                                <textarea
+                                    class="form-control"
+                                    id="reworkNotes"
+                                    rows="3"
+                                    maxlength="5000"
+                                    placeholder="Enter additional observations or remarks..."
+                                ></textarea>
+                            </div>
+
+                        </div>
+
+                        <div class="mt-4" id="reworkMessage"></div>
+
+                        <div class="d-flex justify-content-end gap-2 mt-3">
+                            <button type="reset" class="btn btn-outline-secondary" id="resetReworkBtn">
+                                Reset Form
+                            </button>
+
+                            <button type="submit" class="btn btn-primary" id="submitReworkBtn">
+                                <i class="bi bi-check-circle me-2"></i>Submit Rework
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Rework result -->
+            <div class="dashboard-panel mb-4 d-none" id="reworkResultSection">
+                <div class="panel-heading">
+                    <h5 class="mb-0">
+                        <i class="bi bi-check-circle me-2"></i>Rework Result
+                    </h5>
+                </div>
+                <div class="p-3" id="reworkResultBody"></div>
+            </div>
+
+            <!-- Rework history -->
+            <div class="dashboard-panel mb-4 d-none" id="reworkHistorySection">
+                <div class="panel-heading">
+                    <h5 class="mb-0">
+                        <i class="bi bi-clock-history me-2"></i>Rework History
+                    </h5>
+                </div>
+
+                <div class="p-3" id="reworkHistoryBody"></div>
+            </div>
+
+        </section>
+
+        <footer class="main-footer">
+            Washing Machine Complaint Management System
+        </footer>
+
+    </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/assets/js/app.js"></script>
+<script src="/assets/js/rework.js"></script>
+
+</body>
+</html>

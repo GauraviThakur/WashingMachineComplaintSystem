@@ -1,13 +1,14 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 
 from app.services.bulk_request_service import (
     get_bulk_request_details,
     process_bulk_upload,
+    search_bulk_request_records,
 )
 from app.services.bulk_request_report_service import (
     generate_bulk_request_report,
@@ -57,6 +58,20 @@ async def upload_bulk_complaints(
             status_code=422,
             detail="The uploaded file contains invalid data.",
         ) from exc
+
+
+@router.get("/search")
+def search_bulk_request_endpoint(
+    query: Annotated[str, Query(min_length=1, max_length=255)],
+):
+    """Search bulk requests by ID or uploaded filename."""
+
+    results = search_bulk_request_records(query)
+
+    return {
+        "count": len(results),
+        "results": results,
+    }
 
 
 @router.get("/{bulk_request_id}/report.xlsx")

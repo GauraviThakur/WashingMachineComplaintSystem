@@ -1,4 +1,3 @@
-
 from typing import Any
 
 from app.database.connection import get_db_connection
@@ -29,7 +28,10 @@ def record_complaint_decision(
         complaint_id = complaint["complaint_id"]
         current_status = complaint["complaint_status"]
 
-        if current_status != "AWAITING_DECISION":
+        if current_status not in (
+            "AWAITING_DECISION",
+            "AWAITING_QUALITY_REVIEW",
+        ):
             return {
                 "error": "invalid_complaint_status",
                 "current_status": current_status,
@@ -78,10 +80,7 @@ def record_complaint_decision(
             ),
         ).fetchone()
 
-        if decision_type == "ACCEPTED":
-            new_status = "AWAITING_DISPOSITION"
-        else:
-            new_status = "AWAITING_DISPOSITION"
+        new_status = "AWAITING_DISPOSITION"
 
         connection.execute(
             """
@@ -166,12 +165,13 @@ def record_complaint_disposition(
         if not decision:
             return {"error": "decision_not_found"}
 
+        # Validate the disposition against the quality decision.
         if decision["decision_type"] == "REJECTED":
-            if disposition_type not in ("SCRAP", "HOLD", "OTHER"):
+            if disposition_type != "SCRAP":
                 return {
                     "error": "invalid_rejected_disposition",
                     "message": (
-                        "Rejected machines must use SCRAP, HOLD, or OTHER "
+                        "Rejected machines must use SCRAP "
                         "as their disposition."
                     ),
                 }
@@ -180,14 +180,12 @@ def record_complaint_disposition(
             if disposition_type not in (
                 "RETURN_TO_STOCK",
                 "RETURN_TO_DEALER",
-                "HOLD",
-                "OTHER",
             ):
                 return {
                     "error": "invalid_accepted_disposition",
                     "message": (
-                        "Accepted machines cannot use SCRAP through this "
-                        "workflow. Choose a permitted disposition."
+                        "Accepted machines must use RETURN_TO_STOCK "
+                        "or RETURN_TO_DEALER."
                     ),
                 }
 
@@ -227,6 +225,190 @@ def record_complaint_disposition(
             ),
         ).fetchone()
 
+        # A disposition does not close the complaint.
+        # The complaint must wait for its physical action.
+        status_mapping = {
+            "RETURN_TO_DEALER": "AWAITING_DISPATCH",
+            "RETURN_TO_STOCK": "AWAITING_STOCK_TRANSFER",
+            "SCRAP": "AWAITING_SCRAP",
+        }
+
+        new_status = status_mapping[disposition_type]
+
+        connection.execute(
+            """
+            UPDATE complaints
+            SET complaint_status = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE complaint_id = %s
+            """,
+            (new_status, complaint_id),
+        )
+
+        connection.execute(
+            """
+            INSERT INTO complaint_history (
+                complaint_id,
+                previous_status,
+                new_status,
+                changed_by,
+                reason
+            )
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (
+                complaint_id,
+                current_status,
+                new_status,
+                recorded_by,
+                (
+                    f"Final disposition recorded: {disposition_type}. "
+                    f"Physical completion is pending. "
+                    f"Reason: {disposition_reason}"
+                ),
+            ),
+        )
+
+        return {
+            "complaint_number": complaint["complaint_number"],
+            "previous_status": current_status,
+            "complaint_status": new_status,
+            "disposition": dict(disposition),
+        }
+
+
+def record_physical_completion(
+    *,
+    complaint_number: str,
+    completion_type: str,
+    reference_number: str | None,
+    completion_details: str | None,
+    completed_by: str,
+) -> dict[str, Any]:
+    with get_db_connection() as connection:
+        complaint = connection.execute(
+            """
+            SELECT
+                complaint_id,
+                complaint_number,
+                complaint_status,
+                bulk_request_id
+            FROM complaints
+            WHERE complaint_number = %s
+            FOR UPDATE
+            """,
+            (complaint_number,),
+        ).fetchone()
+
+        if not complaint:
+            return {"error": "complaint_not_found"}
+
+        complaint_id = complaint["complaint_id"]
+        current_status = complaint["complaint_status"]
+        bulk_request_id = complaint["bulk_request_id"]
+
+        disposition = connection.execute(
+            """
+            SELECT
+                disposition_id,
+                disposition_type
+            FROM complaint_dispositions
+            WHERE complaint_id = %s
+            """,
+            (complaint_id,),
+        ).fetchone()
+
+        if not disposition:
+            return {"error": "disposition_not_found"}
+
+        # Each disposition has exactly one permitted physical action.
+        action_mapping = {
+            "RETURN_TO_DEALER": {
+                "completion_type": "DISPATCH",
+                "status": "AWAITING_DISPATCH",
+            },
+            "RETURN_TO_STOCK": {
+                "completion_type": "STOCK_TRANSFER",
+                "status": "AWAITING_STOCK_TRANSFER",
+            },
+            "SCRAP": {
+                "completion_type": "SCRAP",
+                "status": "AWAITING_SCRAP",
+            },
+        }
+
+        expected_action = action_mapping.get(
+            disposition["disposition_type"]
+        )
+
+        if not expected_action:
+            return {"error": "invalid_disposition"}
+
+        if completion_type != expected_action["completion_type"]:
+            return {
+                "error": "invalid_completion_type",
+                "expected_completion_type": (
+                    expected_action["completion_type"]
+                ),
+            }
+
+        if current_status != expected_action["status"]:
+            return {
+                "error": "invalid_complaint_status",
+                "current_status": current_status,
+                "expected_status": expected_action["status"],
+            }
+
+        if completion_type in ("DISPATCH", "STOCK_TRANSFER"):
+            if not reference_number or not reference_number.strip():
+                return {"error": "completion_reference_required"}
+
+        existing_completion = connection.execute(
+            """
+            SELECT completion_id
+            FROM complaint_physical_completions
+            WHERE complaint_id = %s
+            """,
+            (complaint_id,),
+        ).fetchone()
+
+        if existing_completion:
+            return {"error": "physical_completion_already_recorded"}
+
+        completion = connection.execute(
+            """
+            INSERT INTO complaint_physical_completions (
+                complaint_id,
+                disposition_id,
+                completion_type,
+                reference_number,
+                completion_details,
+                completed_by
+            )
+            VALUES (%s, %s, %s, %s, %s, %s)
+            RETURNING
+                completion_id,
+                completion_type,
+                reference_number,
+                completion_details,
+                completed_by,
+                completed_at
+            """,
+            (
+                complaint_id,
+                disposition["disposition_id"],
+                completion_type,
+                (
+                    reference_number.strip()
+                    if reference_number
+                    else None
+                ),
+                completion_details,
+                completed_by,
+            ),
+        ).fetchone()
+
+        # Close only after physical completion has been recorded.
         new_status = "CLOSED"
 
         connection.execute(
@@ -255,19 +437,92 @@ def record_complaint_disposition(
                 complaint_id,
                 current_status,
                 new_status,
-                recorded_by,
+                completed_by,
                 (
-                    f"Final disposition recorded: {disposition_type}. "
-                    f"Complaint closed. Reason: {disposition_reason}"
+                    f"Physical action completed: {completion_type}. "
+                    f"Reference: {reference_number or 'Not provided'}. "
+                    "Complaint closed after physical completion."
                 ),
             ),
         )
+
+        bulk_completion_status = None
+
+        # Update the parent request only when this complaint
+        # originated from a bulk upload.
+        if bulk_request_id is not None:
+
+            # Lock the parent row so concurrent complaint closures
+            # cannot calculate the parent completion status incorrectly.
+            bulk_request = connection.execute(
+                """
+                SELECT invalid_rows
+                FROM bulk_requests
+                WHERE bulk_request_id = %s
+                FOR UPDATE
+                """,
+                (bulk_request_id,),
+            ).fetchone()
+
+            if bulk_request is not None:
+                remaining_complaints = connection.execute(
+                    """
+                    SELECT COUNT(*) AS open_complaints
+                    FROM complaints
+                    WHERE bulk_request_id = %s
+                      AND complaint_status <> 'CLOSED'
+                    """,
+                    (bulk_request_id,),
+                ).fetchone()
+
+                open_complaint_count = remaining_complaints[
+                    "open_complaints"
+                ]
+
+                if open_complaint_count == 0:
+                    if bulk_request["invalid_rows"] > 0:
+                        bulk_completion_status = "COMPLETED_WITH_ERRORS"
+                    else:
+                        bulk_completion_status = "COMPLETED"
+
+                    connection.execute(
+                        """
+                        UPDATE bulk_requests
+                        SET complaint_completion_status = %s,
+                            complaints_completed_at = CURRENT_TIMESTAMP
+                        WHERE bulk_request_id = %s
+                        """,
+                        (
+                            bulk_completion_status,
+                            bulk_request_id,
+                        ),
+                    )
+
+                else:
+                    bulk_completion_status = "IN_PROGRESS"
+
+                    connection.execute(
+                        """
+                        UPDATE bulk_requests
+                        SET complaint_completion_status = %s,
+                            complaints_completed_at = NULL
+                        WHERE bulk_request_id = %s
+                        """,
+                        (
+                            bulk_completion_status,
+                            bulk_request_id,
+                        ),
+                    )
 
         return {
             "complaint_number": complaint["complaint_number"],
             "previous_status": current_status,
             "complaint_status": new_status,
-            "disposition": dict(disposition),
+            "physical_completion": dict(completion),
+            "bulk_request_id": bulk_request_id,
+            "bulk_complaint_completion_status": (
+                bulk_completion_status
+            ),
         }
 
 
@@ -287,6 +542,8 @@ def get_decision_disposition_history(
         if not complaint:
             return None
 
+        complaint_id = complaint["complaint_id"]
+
         decision = connection.execute(
             """
             SELECT
@@ -299,7 +556,7 @@ def get_decision_disposition_history(
             FROM complaint_decisions
             WHERE complaint_id = %s
             """,
-            (complaint["complaint_id"],),
+            (complaint_id,),
         ).fetchone()
 
         disposition = connection.execute(
@@ -313,7 +570,22 @@ def get_decision_disposition_history(
             FROM complaint_dispositions
             WHERE complaint_id = %s
             """,
-            (complaint["complaint_id"],),
+            (complaint_id,),
+        ).fetchone()
+
+        physical_completion = connection.execute(
+            """
+            SELECT
+                completion_id,
+                completion_type,
+                reference_number,
+                completion_details,
+                completed_by,
+                completed_at
+            FROM complaint_physical_completions
+            WHERE complaint_id = %s
+            """,
+            (complaint_id,),
         ).fetchone()
 
         return {
@@ -322,5 +594,10 @@ def get_decision_disposition_history(
             "decision": dict(decision) if decision else None,
             "disposition": (
                 dict(disposition) if disposition else None
+            ),
+            "physical_completion": (
+                dict(physical_completion)
+                if physical_completion
+                else None
             ),
         }
